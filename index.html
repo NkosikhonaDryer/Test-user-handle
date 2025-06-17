@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TikTok Account Detector</title>
+    <title>Handle Verifier</title>
     <style>
         * {
             margin: 0;
@@ -12,8 +12,8 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #ff0050 0%, #00f5ff 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -22,117 +22,130 @@
         }
 
         .container {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            background: rgba(255, 255, 255, 0.95);
             padding: 40px;
-            max-width: 500px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
             width: 100%;
+            max-width: 500px;
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
             text-align: center;
-        }
-
-        .logo {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-        }
-
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 1.8rem;
-        }
-
-        .subtitle {
-            color: #666;
             margin-bottom: 30px;
-            font-size: 1rem;
         }
 
-        .input-group {
-            margin-bottom: 20px;
-            text-align: left;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
+        .header h1 {
             color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .platform-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .platform-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
             font-weight: 500;
         }
 
-        input[type="text"] {
+        .platform-btn.active {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        .platform-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 25px;
+        }
+
+        .input-group input {
             width: 100%;
-            padding: 12px 16px;
-            border: 2px solid #e1e5e9;
-            border-radius: 8px;
-            font-size: 1rem;
-            transition: border-color 0.3s ease;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1.1em;
+            transition: all 0.3s ease;
+            background: white;
         }
 
-        input[type="text"]:focus {
+        .input-group input:focus {
             outline: none;
-            border-color: #ff0050;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
-        .btn {
-            background: linear-gradient(45deg, #ff0050, #ff4081);
+        .search-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
             color: white;
             border: none;
-            padding: 14px 32px;
-            border-radius: 8px;
-            font-size: 1rem;
+            border-radius: 10px;
+            font-size: 1.1em;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            width: 100%;
-            margin-top: 10px;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
-        .btn:hover {
+        .search-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(255, 0, 80, 0.3);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
         }
 
-        .btn:disabled {
+        .search-btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
             transform: none;
         }
 
-        .result {
-            margin-top: 30px;
-            padding: 20px;
-            border-radius: 8px;
-            text-align: left;
-            display: none;
-        }
-
-        .result.success {
-            background: #f0f9ff;
-            border: 1px solid #0ea5e9;
-            color: #0c4a6e;
-        }
-
-        .result.error {
-            background: #fef2f2;
-            border: 1px solid #ef4444;
-            color: #991b1b;
-        }
-
         .loading {
             display: none;
-            margin-top: 10px;
+            text-align: center;
+            margin: 20px 0;
+            color: #667eea;
         }
 
         .spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #ff0050;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
             border-radius: 50%;
+            width: 30px;
+            height: 30px;
             animation: spin 1s linear infinite;
-            display: inline-block;
-            margin-right: 10px;
+            margin: 0 auto 10px;
         }
 
         @keyframes spin {
@@ -140,257 +153,259 @@
             100% { transform: rotate(360deg); }
         }
 
-        .account-card {
-            background: #f8fafc;
+        .result {
+            display: none;
+            margin-top: 30px;
             padding: 20px;
-            border-radius: 12px;
-            margin-top: 15px;
-            text-align: center;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
         }
 
-        .profile-image {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            margin: 0 auto 15px;
-            display: block;
-            border: 3px solid #ff0050;
-            object-fit: cover;
+        .result.error {
+            border-left-color: #ff6b6b;
+            background: #ffebee;
         }
 
-        .account-info h3 {
-            color: #1e293b;
-            margin-bottom: 8px;
-            font-size: 1.2rem;
+        .result.success {
+            border-left-color: #4caf50;
+            background: #e8f5e8;
         }
 
-        .account-info p {
-            margin: 6px 0;
-            color: #475569;
-            font-size: 0.9rem;
+        .profile-info {
+            display: grid;
+            gap: 10px;
         }
 
-        .account-type {
+        .profile-field {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .profile-field:last-child {
+            border-bottom: none;
+        }
+
+        .field-label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .field-value {
+            color: #333;
+        }
+
+        .status-badge {
             display: inline-block;
             padding: 4px 12px;
             border-radius: 20px;
-            font-size: 0.8rem;
+            font-size: 0.9em;
             font-weight: 600;
-            margin: 8px 0;
         }
 
-        .account-type.business {
-            background: #dcfce7;
-            color: #166534;
+        .status-exists {
+            background: #4caf50;
+            color: white;
         }
 
-        .account-type.personal {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .account-type.creator {
-            background: #e0e7ff;
-            color: #3730a3;
-        }
-
-        .stats {
-            display: flex;
-            justify-content: space-around;
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #e2e8f0;
-        }
-
-        .stat {
-            text-align: center;
-        }
-
-        .stat-number {
-            font-weight: bold;
-            color: #1e293b;
-            font-size: 1.1rem;
-        }
-
-        .stat-label {
-            font-size: 0.8rem;
-            color: #64748b;
-        }
-
-        .verified-badge {
-            color: #0ea5e9;
-            margin-left: 5px;
+        .status-not-found {
+            background: #ff6b6b;
+            color: white;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="logo">🎵</div>
-        <h1>TikTok Account Detector</h1>
-        <p class="subtitle">Enter a TikTok username to detect account type and view profile info</p>
-        
-        <form id="detectorForm">
+        <div class="header">
+            <h1>🔍 Handle Verifier</h1>
+            <p>Check if a username exists on Instagram or TikTok</p>
+        </div>
+
+        <form id="verificationForm">
+            <div class="platform-selector">
+                <button type="button" class="platform-btn active" data-platform="instagram">
+                    📷 Instagram
+                </button>
+                <button type="button" class="platform-btn" data-platform="tiktok">
+                    🎵 TikTok
+                </button>
+            </div>
+
             <div class="input-group">
-                <label for="username">TikTok Username</label>
                 <input 
                     type="text" 
                     id="username" 
-                    name="username" 
-                    placeholder="e.g., charlidamelio, therock, yourhandle"
+                    placeholder="Enter username (without @)" 
                     required
+                    autocomplete="off"
                 >
             </div>
-            
-            <button type="submit" class="btn" id="submitBtn">
-                Analyze TikTok Account
+
+            <button type="submit" class="search-btn" id="searchBtn">
+                🔍 Verify Handle
             </button>
-            
-            <div class="loading" id="loading">
-                <div class="spinner"></div>
-                Analyzing TikTok account...
-            </div>
         </form>
-        
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Checking handle...</p>
+        </div>
+
         <div class="result" id="result">
             <div id="resultContent"></div>
         </div>
     </div>
 
     <script>
-        
-        const WEBHOOK_URL = 'https://n8n-67295956827.africa-south1.run.app/webhook/user-handle';
-        
-        const form = document.getElementById('detectorForm');
-        const submitBtn = document.getElementById('submitBtn');
-        const loading = document.getElementById('loading');
-        const result = document.getElementById('result');
-        const resultContent = document.getElementById('resultContent');
+        let selectedPlatform = 'instagram';
 
-        form.addEventListener('submit', async (e) => {
+        // Platform selection
+        document.querySelectorAll('.platform-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.platform-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedPlatform = btn.dataset.platform;
+            });
+        });
+
+        // Form submission
+        document.getElementById('verificationForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const username = document.getElementById('username').value.trim();
             if (!username) return;
 
-            // Show loading state
-            submitBtn.disabled = true;
-            loading.style.display = 'block';
-            result.style.display = 'none';
+            showLoading(true);
+            hideResult();
 
             try {
-                // Send request to n8n webhook
-                const response = await fetch(WEBHOOK_URL, {
+                // Replace this URL with your actual n8n webhook URL
+                const n8nWebhookUrl = 'https://n8n-67295956827.africa-south1.run.app/webhook/user-handle';
+                
+                const response = await fetch(n8nWebhookUrl, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         username: username,
-                        platform: 'tiktok',
-                        action: 'detect_account_type'
+                        platform: selectedPlatform,
+                        timestamp: new Date().toISOString()
                     })
                 });
 
-                const data = await response.json();
-                
-                // Hide loading
-                loading.style.display = 'none';
-                submitBtn.disabled = false;
-                
-                // Show result
-                if (response.ok && data) {
-                    showResult(data, 'success');
-                } else {
-                    showResult({ error: 'Failed to detect TikTok account type' }, 'error');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
+
+                const result = await response.json();
+                displayResult(result);
 
             } catch (error) {
                 console.error('Error:', error);
-                loading.style.display = 'none';
-                submitBtn.disabled = false;
-                showResult({ error: 'Network error occurred' }, 'error');
+                displayError('Failed to verify handle. Please try again.');
+            } finally {
+                showLoading(false);
             }
         });
 
-        function showResult(data, type) {
-            result.className = `result ${type}`;
-            result.style.display = 'block';
-            
-            if (type === 'success') {
-                resultContent.innerHTML = formatSuccessResult(data);
-            } else {
-                resultContent.innerHTML = `
-                    <h3>❌ Error</h3>
-                    <p>${data.error || 'Something went wrong'}</p>
-                `;
-            }
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+            document.getElementById('searchBtn').disabled = show;
         }
 
-        function formatSuccessResult(data) {
-            const username = document.getElementById('username').value;
+        function hideResult() {
+            document.getElementById('result').style.display = 'none';
+        }
+
+        function displayResult(data) {
+            const resultDiv = document.getElementById('result');
+            const contentDiv = document.getElementById('resultContent');
             
-            const exists = data.exists;
-            const title = data.title || '';
-            const imageUrl = data.imageUrl || '';
-            const error = data.error;
-            
-            if (error) {
-                return `
-                    <h3>❌ Error</h3>
-                    <p>${error}</p>
-                `;
-            }
-            
-            if (!exists) {
-                return `
-                    <h3>❌ Account Not Found</h3>
-                    <p>The TikTok account "@${username}" does not exist or is private.</p>
-                `;
-            }
-            
-            // Determine account type from title
-            let accountType = 'Personal';
-            if (title.toLowerCase().includes('business') || title.toLowerCase().includes('brand')) {
-                accountType = 'Business';
-            } else if (title.toLowerCase().includes('creator') || title.toLowerCase().includes('official')) {
-                accountType = 'Creator';
-            }
-            
-            const accountTypeClass = accountType.toLowerCase();
-            
-            return `
-                <h3>✅ TikTok Account Found</h3>
-                <div class="account-card">
-                    ${imageUrl ? `<img src="${imageUrl}" alt="Profile" class="profile-image" onerror="this.style.display='none'">` : ''}
-                    
-                    <div class="account-info">
-                        <h3>@${username}</h3>
-                        
-                        <span class="account-type ${accountTypeClass}">
-                            ${accountType} Account
-                        </span>
-                        
-                        ${title ? `<p><strong>Title:</strong> ${title}</p>` : ''}
-                        <p><strong>Status:</strong> Account exists and is accessible</p>
-                        <p><strong>Image URL:</strong> ${imageUrl ? 'Available' : 'Not available'}</p>
+            if (data.exists) {
+                resultDiv.className = 'result success';
+                contentDiv.innerHTML = `
+                    <h3>✅ Profile Found!</h3>
+                    <div class="profile-info">
+                        <div class="profile-field">
+                            <span class="field-label">Username:</span>
+                            <span class="field-value">@${data.username || 'N/A'}</span>
+                        </div>
+                        <div class="profile-field">
+                            <span class="field-label">Platform:</span>
+                            <span class="field-value">${selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)}</span>
+                        </div>
+                        <div class="profile-field">
+                            <span class="field-label">Status:</span>
+                            <span class="status-badge status-exists">Active Profile</span>
+                        </div>
+                        ${data.title ? `
+                        <div class="profile-field">
+                            <span class="field-label">Title:</span>
+                            <span class="field-value">${data.title}</span>
+                        </div>
+                        ` : ''}
+                        ${data.imageUrl ? `
+                        <div class="profile-field">
+                            <span class="field-label">Profile Image:</span>
+                            <span class="field-value">Available</span>
+                        </div>
+                        ` : ''}
                     </div>
-                </div>
-            `;
-        }
-
-        function formatNumber(num) {
-            if (num >= 1000000) {
-                return (num / 1000000).toFixed(1) + 'M';
-            } else if (num >= 1000) {
-                return (num / 1000).toFixed(1) + 'K';
+                `;
+            } else {
+                resultDiv.className = 'result error';
+                contentDiv.innerHTML = `
+                    <h3>❌ Profile Not Found</h3>
+                    <div class="profile-info">
+                        <div class="profile-field">
+                            <span class="field-label">Username:</span>
+                            <span class="field-value">@${document.getElementById('username').value}</span>
+                        </div>
+                        <div class="profile-field">
+                            <span class="field-label">Platform:</span>
+                            <span class="field-value">${selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)}</span>
+                        </div>
+                        <div class="profile-field">
+                            <span class="field-label">Status:</span>
+                            <span class="status-badge status-not-found">Not Found</span>
+                        </div>
+                    </div>
+                    <p style="margin-top: 15px; color: #666; font-style: italic;">
+                        This username might be available or the profile might be private.
+                    </p>
+                `;
             }
-            return num.toString();
+            
+            resultDiv.style.display = 'block';
         }
 
-        // Remove @ symbol if user types it
-        document.getElementById('username').addEventListener('input', (e) => {
-            e.target.value = e.target.value.replace('@', '');
-        });
+        function displayError(message) {
+            const resultDiv = document.getElementById('result');
+            const contentDiv = document.getElementById('resultContent');
+            
+            resultDiv.className = 'result error';
+            contentDiv.innerHTML = `
+                <h3>⚠️ Error</h3>
+                <p>${message}</p>
+            `;
+            resultDiv.style.display = 'block';
+        }
+
+        // Demo mode - remove this in production
+        // Uncomment the lines below to test without actual API
+        /*
+        setTimeout(() => {
+            displayResult({
+                exists: true,
+                username: 'demo_user',
+                title: 'Demo Profile',
+                imageUrl: 'https://example.com/image.jpg'
+            });
+        }, 2000);
+        */
     </script>
 </body>
 </html>
