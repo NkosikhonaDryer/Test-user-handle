@@ -282,7 +282,7 @@
 
             try {
                 // Replace this URL with your actual n8n webhook URL
-                const n8nWebhookUrl = 'https://n8n-67295956827.africa-south1.run.app/webhook/user-handle';
+                //const n8nWebhookUrl = 'https://user-handle-app-r8n.cloud/workflow/1bDC4xS6aqmXZssN';
                 
                 const response = await fetch(n8nWebhookUrl, {
                     method: 'POST',
@@ -324,35 +324,62 @@
             const resultDiv = document.getElementById('result');
             const contentDiv = document.getElementById('resultContent');
             
-            if (data.exists) {
+            // Handle different response structures from RapidAPI
+            let profileData = data;
+            if (data.result && data.result.user_list && data.result.user_list.length > 0) {
+                profileData = data.result.user_list[0]; // TikTok structure
+            } else if (data.result && data.result.user) {
+                profileData = data.result.user; // Instagram structure
+            }
+            
+            if (profileData && (profileData.username || profileData.uniqueId || profileData.nickname)) {
                 resultDiv.className = 'result success';
+                
+                const username = profileData.username || profileData.uniqueId || profileData.nickname || 'N/A';
+                const fullName = profileData.full_name || profileData.nickname || 'N/A';
+                const biography = profileData.biography || profileData.signature || 'No bio available';
+                const verified = profileData.verified || false;
+                const followerCount = profileData.follower_count || profileData.fanCount || 'N/A';
+                const followingCount = profileData.following_count || profileData.followingCount || 'N/A';
+                const profilePicUrl = profileData.profile_pic_url || profileData.avatarMedium || '';
+                
                 contentDiv.innerHTML = `
                     <h3>✅ Profile Found!</h3>
                     <div class="profile-info">
+                        ${profilePicUrl ? `
+                        <div class="profile-field">
+                            <span class="field-label">Profile Image:</span>
+                            <img src="${profilePicUrl}" alt="Profile" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+                        </div>
+                        ` : ''}
                         <div class="profile-field">
                             <span class="field-label">Username:</span>
-                            <span class="field-value">@${data.username || 'N/A'}</span>
+                            <span class="field-value">@${username} ${verified ? '✓' : ''}</span>
+                        </div>
+                        <div class="profile-field">
+                            <span class="field-label">Full Name:</span>
+                            <span class="field-value">${fullName}</span>
                         </div>
                         <div class="profile-field">
                             <span class="field-label">Platform:</span>
                             <span class="field-value">${selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)}</span>
                         </div>
                         <div class="profile-field">
+                            <span class="field-label">Bio:</span>
+                            <span class="field-value">${biography}</span>
+                        </div>
+                        <div class="profile-field">
+                            <span class="field-label">Followers:</span>
+                            <span class="field-value">${followerCount.toLocaleString ? followerCount.toLocaleString() : followerCount}</span>
+                        </div>
+                        <div class="profile-field">
+                            <span class="field-label">Following:</span>
+                            <span class="field-value">${followingCount.toLocaleString ? followingCount.toLocaleString() : followingCount}</span>
+                        </div>
+                        <div class="profile-field">
                             <span class="field-label">Status:</span>
                             <span class="status-badge status-exists">Active Profile</span>
                         </div>
-                        ${data.title ? `
-                        <div class="profile-field">
-                            <span class="field-label">Title:</span>
-                            <span class="field-value">${data.title}</span>
-                        </div>
-                        ` : ''}
-                        ${data.imageUrl ? `
-                        <div class="profile-field">
-                            <span class="field-label">Profile Image:</span>
-                            <span class="field-value">Available</span>
-                        </div>
-                        ` : ''}
                     </div>
                 `;
             } else {
@@ -396,7 +423,7 @@
 
         // Demo mode - remove this in production
         // Uncomment the lines below to test without actual API
-        /*
+        
         setTimeout(() => {
             displayResult({
                 exists: true,
@@ -405,7 +432,7 @@
                 imageUrl: 'https://example.com/image.jpg'
             });
         }, 2000);
-        */
+        
     </script>
 </body>
 </html>
