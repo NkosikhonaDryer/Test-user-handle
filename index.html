@@ -282,7 +282,7 @@
 
             try {
                 // Replace this URL with your actual n8n webhook URL
-                //const n8nWebhookUrl = 'https://user-handle-app-r8n.cloud/workflow/1bDC4xS6aqmXZssN';
+                const n8nWebhookUrl = 'https://user-handle-app-r8n.cloud/workflow/1bDC4xS6aqmXZssN';
                 
                 const response = await fetch(n8nWebhookUrl, {
                     method: 'POST',
@@ -336,49 +336,36 @@
                 resultDiv.className = 'result success';
                 
                 const username = profileData.username || profileData.uniqueId || profileData.nickname || 'N/A';
-                const fullName = profileData.full_name || profileData.nickname || 'N/A';
-                const biography = profileData.biography || profileData.signature || 'No bio available';
-                const verified = profileData.verified || false;
-                const followerCount = profileData.follower_count || profileData.fanCount || 'N/A';
-                const followingCount = profileData.following_count || profileData.followingCount || 'N/A';
-                const profilePicUrl = profileData.profile_pic_url || profileData.avatarMedium || '';
+                const userTitle = profileData.full_name || profileData.nickname || profileData.biography || 'No title available';
+                const profilePicUrl = profileData.profile_pic_url || profileData.avatarMedium || profileData.avatarLarger || '';
+                const platform = selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1);
                 
                 contentDiv.innerHTML = `
                     <h3>✅ Profile Found!</h3>
                     <div class="profile-info">
-                        ${profilePicUrl ? `
-                        <div class="profile-field">
-                            <span class="field-label">Profile Image:</span>
-                            <img src="${profilePicUrl}" alt="Profile" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+                        <div class="profile-field" style="text-align: center; margin-bottom: 20px;">
+                            ${profilePicUrl ? `
+                                <img src="${profilePicUrl}" alt="Profile Picture" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid #667eea; margin-bottom: 10px;">
+                            ` : `
+                                <div style="width: 80px; height: 80px; border-radius: 50%; background: #f0f0f0; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; border: 3px solid #667eea;">
+                                    <span style="font-size: 30px;">👤</span>
+                                </div>
+                            `}
+                            <div style="font-weight: bold; font-size: 1.2em; color: #333;">@${username}</div>
                         </div>
-                        ` : ''}
-                        <div class="profile-field">
-                            <span class="field-label">Username:</span>
-                            <span class="field-value">@${username} ${verified ? '✓' : ''}</span>
-                        </div>
-                        <div class="profile-field">
-                            <span class="field-label">Full Name:</span>
-                            <span class="field-value">${fullName}</span>
-                        </div>
+                        
                         <div class="profile-field">
                             <span class="field-label">Platform:</span>
-                            <span class="field-value">${selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)}</span>
+                            <span class="field-value">${platform}</span>
                         </div>
+                        
                         <div class="profile-field">
-                            <span class="field-label">Bio:</span>
-                            <span class="field-value">${biography}</span>
+                            <span class="field-label">Title/Name:</span>
+                            <span class="field-value">${userTitle}</span>
                         </div>
-                        <div class="profile-field">
-                            <span class="field-label">Followers:</span>
-                            <span class="field-value">${followerCount.toLocaleString ? followerCount.toLocaleString() : followerCount}</span>
-                        </div>
-                        <div class="profile-field">
-                            <span class="field-label">Following:</span>
-                            <span class="field-value">${followingCount.toLocaleString ? followingCount.toLocaleString() : followingCount}</span>
-                        </div>
-                        <div class="profile-field">
-                            <span class="field-label">Status:</span>
-                            <span class="status-badge status-exists">Active Profile</span>
+                        
+                        <div class="profile-field" style="border-bottom: none; text-align: center; margin-top: 15px;">
+                            <span class="status-badge status-exists">Profile Exists</span>
                         </div>
                     </div>
                 `;
@@ -387,22 +374,22 @@
                 contentDiv.innerHTML = `
                     <h3>❌ Profile Not Found</h3>
                     <div class="profile-info">
-                        <div class="profile-field">
-                            <span class="field-label">Username:</span>
-                            <span class="field-value">@${document.getElementById('username').value}</span>
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <div style="width: 80px; height: 80px; border-radius: 50%; background: #f0f0f0; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; border: 3px solid #ff6b6b;">
+                                <span style="font-size: 30px;">❌</span>
+                            </div>
+                            <div style="font-weight: bold; font-size: 1.2em; color: #333;">@${document.getElementById('username').value}</div>
                         </div>
+                        
                         <div class="profile-field">
                             <span class="field-label">Platform:</span>
                             <span class="field-value">${selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)}</span>
                         </div>
-                        <div class="profile-field">
-                            <span class="field-label">Status:</span>
-                            <span class="status-badge status-not-found">Not Found</span>
+                        
+                        <div class="profile-field" style="border-bottom: none; text-align: center; margin-top: 15px;">
+                            <span class="status-badge status-not-found">Profile Not Found</span>
                         </div>
                     </div>
-                    <p style="margin-top: 15px; color: #666; font-style: italic;">
-                        This username might be available or the profile might be private.
-                    </p>
                 `;
             }
             
@@ -423,7 +410,7 @@
 
         // Demo mode - remove this in production
         // Uncomment the lines below to test without actual API
-        
+        /*
         setTimeout(() => {
             displayResult({
                 exists: true,
@@ -432,7 +419,7 @@
                 imageUrl: 'https://example.com/image.jpg'
             });
         }, 2000);
-        
+        */
     </script>
 </body>
 </html>
