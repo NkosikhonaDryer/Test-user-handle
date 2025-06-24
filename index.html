@@ -621,7 +621,6 @@
             }
         }
 
-        // UPDATED: Save function now takes handle and uniqueId to update the correct card
         async function saveProfileWithContact(handle, uniqueId, contactNumber, fullName) {
             const saveBtn = document.getElementById(`saveBtn-${uniqueId}`);
             updateSaveButtonState(true, '⏳ Saving...', uniqueId);
@@ -650,7 +649,6 @@
 
                 if (!response.ok) throw new Error(`Failed to save: ${await response.text()}`);
                 
-                // Update the specific card that triggered the save
                 const cardThatSaved = document.getElementById(`card-${uniqueId}`);
                 if (cardThatSaved) {
                     const contactForm = cardThatSaved.querySelector('.contact-form');
@@ -662,7 +660,6 @@
                        resultActions.style.display = 'none';
                     }
                 }
-
 
             } catch (error) {
                 console.error('Save error:', error);
@@ -678,7 +675,7 @@
         
         function displayLoadingCard(handle, platform, uniqueId) {
             let card = document.getElementById(`card-${uniqueId}`);
-             if(card) card.remove(); // Remove if a previous search for this exact platform failed and is being retried.
+             if(card) card.remove();
             
             const loadingCardHTML = `
                 <div class="result-card loading-card" id="card-${uniqueId}">
@@ -691,7 +688,6 @@
             resultsContainer.insertAdjacentHTML('beforeend', loadingCardHTML);
         }
 
-        // UPDATED: Now creates a separate card for each search result
         function processAndDisplayResults(data, handle, platform, uniqueId) {
             if (!sessionDataStore[handle]) {
                 sessionDataStore[handle] = {};
@@ -715,7 +711,7 @@
             renderSeparateCard(profileData, handle, platform, uniqueId);
         }
 
-        // NEW: Renders a single card for a specific platform search
+        // UPDATED: Added notification logic for Personal accounts
         function renderSeparateCard(profileData, handle, platform, uniqueId) {
             let card = document.getElementById(`card-${uniqueId}`);
             
@@ -724,12 +720,11 @@
             const statusIcon = exists ? '✅' : '❌';
             const statusText = exists ? 'Handle Exists' : 'Handle Does Not Exist';
             const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
-            const platformIcon = platform === 'instagram' ? '📷' : '🎵';
             
-            let detailsHTML = '', contactFormHTML = '', actionsHTML = '', badgeHTML = '';
+            let detailsHTML = '', contactFormHTML = '', actionsHTML = '', badgeHTML = '', notificationHTML = '';
 
             if (exists) {
-                const { nickname, accountType, profileUrl } = profileData;
+                const { nickname, accountType, profileUrl, username } = profileData;
                 const badgeClass = accountType === 'Business' ? 'badge-business' : 'badge-personal';
                 badgeHTML = `<div class="result-badge ${badgeClass}">${accountType}</div>`;
 
@@ -740,15 +735,49 @@
                             <span>Name: <span class="detail-value">${nickname}</span></span>
                         </div>
                         <div class="detail-item">
-                            <span>🔗</span>
-                            <span><a href="${profileUrl}" target="_blank" class="notification-link">View Profile <span>↗</span></a></span>
+                            <span>📱</span>
+                            <span>Platform: <span class="detail-value">${platformName}</span></span>
                         </div>
+                        <div class="detail-item">
+                            <span>🏷️</span>
+                            <span>Username: <span class="detail-value">@${username}</span></span>
+                        </div>
+                        <div class="detail-item">
+                            <span>📊</span>
+                            <span>Status: <span class="detail-value">${statusText}</span></span>
+                        </div>
+                    </div>
+                    <div class="result-actions" style="justify-content: flex-start; margin-top: 0; margin-bottom: 15px;">
+                         <a href="${profileUrl}" target="_blank" class="action-btn btn-secondary">🔗 View Profile</a>
                     </div>
                 `;
 
                 const isInstaPersonal = platform === 'instagram' && accountType === 'Personal';
                 const saveDisabledAttr = isInstaPersonal ? 'disabled' : '';
                 const saveDisabledTitle = isInstaPersonal ? 'Cannot save Personal Instagram accounts.' : 'Save all found profiles for this user';
+                
+                // ADDED: Notification logic for Personal accounts
+                if (accountType === 'Personal') {
+                    const instructionUrl = platform === 'instagram' 
+                        ? 'https://help.instagram.com/502981923235522'
+                        : 'https://support.tiktok.com/en/business-and-creator/creator-and-business-accounts/business-account-on-tiktok';
+                    
+                    notificationHTML = `
+                        <div class="notification">
+                            <div class="notification-icon">💡</div>
+                            <div class="notification-content">
+                                <div class="notification-title">Switch to Professional Account</div>
+                                <div class="notification-text">
+                                    This is a Personal account. To unlock more features and analytics, consider switching to a professional account.
+                                </div>
+                                <a href="${instructionUrl}" target="_blank" class="notification-link">
+                                    📚 View ${platformName} Instructions
+                                    <span>↗</span>
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                }
                 
                 contactFormHTML = `
                     <div class="contact-form" id="contactForm-${uniqueId}">
@@ -775,10 +804,11 @@
             const cardHTML = `
                  <div class="result-card ${cardClass}" id="card-${uniqueId}">
                     <div class="result-header">
-                        <div class="result-title">${platformIcon} ${platformName} Result for @${handle}</div>
+                        <div class="result-title">${statusIcon} ${statusText}</div>
                          ${badgeHTML}
                     </div>
                     ${detailsHTML}
+                    ${notificationHTML}
                     ${contactFormHTML}
                     ${actionsHTML}
                 </div>
