@@ -131,12 +131,9 @@
             border-radius: 15px;
             padding: 20px;
             margin: 20px 0;
-            display: none;
+            /* Initially hidden, shown via script */
+            display: block; 
             animation: slideIn 0.3s ease-out;
-        }
-
-        .contact-form.show {
-            display: block;
         }
 
         @keyframes slideIn {
@@ -521,6 +518,7 @@
         // State management
         let currentPlatform = 'instagram';
         let isSearching = false;
+        // NEW: sessionDataStore now caches all searches by a unique key 'platform-handle'
         let sessionDataStore = {};
 
         // DOM elements
@@ -543,7 +541,8 @@
                 const examples = currentPlatform === 'instagram' ? 'nike, spotify' : 'mrbeast, charlidamelio';
                 handleInput.placeholder = `Enter ${platformName} username (e.g., ${examples})`;
                 
-                resultsContainer.innerHTML = '';
+                // REMOVED: No longer clearing results on platform switch to allow multiple results to be shown.
+                // resultsContainer.innerHTML = ''; 
             });
         });
 
@@ -559,13 +558,10 @@
             if (isSearching) return;
             
             isSearching = true;
+            // A temporary loading card will be added
+            displayLoadingCard(handle, platform);
             updateUI('searching');
             
-            // Reset data store for new handle
-            if (sessionDataStore.username !== handle) {
-                sessionDataStore = { username: handle };
-            }
-
             try {
                 const response = await fetch(config.searchWebhookUrl, {
                     method: 'POST',
@@ -585,11 +581,13 @@
                 }
 
                 const data = await response.json();
+                // Replace loading card with the actual result card
                 displayResults(data, handle, platform);
                 updateUI('success');
                 
             } catch (error) {
                 console.error('Search error:', error);
+                // Replace loading card with an error card
                 displayError(error.message, handle, platform);
                 updateUI('error');
             } finally {
@@ -598,18 +596,24 @@
         }
 
         // Save profile with contact information
-        async function saveProfileWithContact(contactNumber, fullName) {
-            const saveBtn = document.getElementById('saveBtn');
-            updateSaveButtonState(true, '⏳ Saving...');
+        async function saveProfileWithContact(uniqueId, contactNumber, fullName) {
+            const saveBtn = document.getElementById(`saveBtn-${uniqueId}`);
+            updateSaveButtonState(true, '⏳ Saving...', uniqueId);
 
             try {
+                const [platform, handle] = uniqueId.split('-');
+
+                // Get all data for the handle
+                const instaData = sessionDataStore[`instagram-${handle}`];
+                const tiktokData = sessionDataStore[`tiktok-${handle}`];
+
                 const payload = {
-                    Name: fullName || sessionDataStore.nickname,
+                    Name: fullName || (instaData || tiktokData).nickname,
                     ContactNumber: formatPhoneNumber(contactNumber),
-                    TikTokLink: sessionDataStore.tiktok ? sessionDataStore.tiktok.profileUrl : null,
-                    Instagram_Link: sessionDataStore.instagram ? sessionDataStore.instagram.profileUrl : null,
-                    username: sessionDataStore.username,
-                    nickname: sessionDataStore.nickname,
+                    TikTokLink: tiktokData ? tiktokData.profileUrl : null,
+                    Instagram_Link: instaData ? instaData.profileUrl : null,
+                    username: handle,
+                    nickname: (instaData || tiktokData).nickname,
                     dateAdded: new Date().toISOString(),
                     source: 'handle-search-tool'
                 };
@@ -627,11 +631,11 @@
                     throw new Error(`Failed to save: ${await response.text()}`);
                 }
                 
-                const contactForm = document.getElementById('contactForm');
-                const resultActions = document.querySelector('.result-actions');
+                const contactForm = document.getElementById(`contactForm-${uniqueId}`);
+                const resultActions = document.getElementById(`resultActions-${uniqueId}`);
                 
                 if (contactForm) {
-                    contactForm.innerHTML = `<div class="success-message">✅ Profile saved successfully!</div>`;
+                    contactForm.innerHTML = `<div class="success-message">✅ Profile for @${handle} saved successfully!</div>`;
                 }
                 if (resultActions) {
                     resultActions.style.display = 'none';
@@ -639,18 +643,39 @@
 
             } catch (error) {
                 console.error('Save error:', error);
-                const errorMsg = document.getElementById('contactError');
+                const errorMsg = document.getElementById(`contactError-${uniqueId}`);
                 if (errorMsg) {
                     errorMsg.textContent = error.message;
                     errorMsg.classList.add('show');
                 }
-                updateSaveButtonState(false, '❌ Save Failed');
-                setTimeout(() => updateSaveButtonState(false, '💾 Save with Contact'), 2000);
+                updateSaveButtonState(false, '❌ Save Failed', uniqueId);
+                setTimeout(() => updateSaveButtonState(false, '💾 Save with Contact', uniqueId), 2000);
             }
+        }
+        
+        // Function to show a temporary loading card
+        function displayLoadingCard(handle, platform) {
+            const uniqueId = `${platform}-${handle}`;
+            const loadingCardHTML = `
+                <div class="result-card" id="card-${uniqueId}">
+                    <div class="loading">
+                        <div class="loading-spinner"></div>
+                        <h3>Searching ${platform} for @${handle}...</h3>
+                        <p>Analyzing account details...</p>
+                    </div>
+                </div>
+            `;
+            // Remove previous loading card if it exists
+            const existingLoading = document.querySelector('.loading-card');
+            if(existingLoading) existingLoading.remove();
+
+            resultsContainer.insertAdjacentHTML('beforeend', loadingCardHTML);
+            document.getElementById(`card-${uniqueId}`).classList.add('loading-card');
         }
 
         // Display search results
         function displayResults(data, handle, platform) {
+            const uniqueId = `${platform}-${handle}`;
             const exists = data && data.exists;
             let currentProfileData = null;
 
@@ -663,9 +688,8 @@
                     profileUrl: data.profileUrl || (platform === 'instagram' ? `https://instagram.com/${handle}` : `https://tiktok.com/@${handle}`)
                 };
                 
-                // Store successful search result
-                sessionDataStore[platform] = currentProfileData;
-                sessionDataStore.nickname = currentProfileData.nickname;
+                // Store successful search result in cache
+                sessionDataStore[uniqueId] = currentProfileData;
             }
 
             const cardClass = exists ? 'found' : 'not-found';
@@ -699,30 +723,34 @@
                         </div>
                     </div>
                 `;
+                
+                // NEW: Conditionally disable save button for Personal Instagram accounts
+                const isInstaPersonal = platform === 'instagram' && accountType === 'Personal';
+                const saveDisabledAttr = isInstaPersonal ? 'disabled' : '';
+                const saveDisabledTitle = isInstaPersonal ? 'Cannot save a Personal Instagram account.' : 'Save profile with contact';
 
                 contactFormHTML = `
-                    <div class="contact-form show" id="contactForm">
+                    <div class="contact-form" id="contactForm-${uniqueId}">
                         <h3>📞 Add Contact Information</h3>
                         <div class="contact-input-group">
-                            <input type="text" class="contact-input" placeholder="Full Name" id="fullNameInput" value="${sessionDataStore.nickname}">
-                            <input type="tel" class="contact-input" placeholder="Phone Number (e.g., +1234567890)" id="contactInput" required>
+                            <input type="text" class="contact-input" placeholder="Full Name" id="fullNameInput-${uniqueId}" value="${currentProfileData.nickname}">
+                            <input type="tel" class="contact-input" placeholder="Phone Number (e.g., +1234567890)" id="contactInput-${uniqueId}" required>
                         </div>
-                        <div class="error-message" id="contactError"></div>
+                        <div class="error-message" id="contactError-${uniqueId}"></div>
                     </div>
                 `;
                 
                 actionsHTML = `
-                    <div class="result-actions">
+                    <div class="result-actions" id="resultActions-${uniqueId}">
                         <a href="${currentProfileData.profileUrl}" target="_blank" class="action-btn btn-secondary">
                             🔗 View Profile
                         </a>
-                        <button onclick="handleSaveClick()" class="action-btn btn-save" id="saveBtn">
+                        <button onclick="handleSaveClick('${uniqueId}')" class="action-btn btn-save" id="saveBtn-${uniqueId}" ${saveDisabledAttr} title="${saveDisabledTitle}">
                             💾 Save with Contact
                         </button>
                     </div>
                 `;
 
-                // Professional account notification for personal accounts
                 if (accountType === 'Personal') {
                     const instructionUrl = currentProfileData.platform === 'Instagram' 
                         ? 'https://help.instagram.com/502981923235522'
@@ -748,7 +776,7 @@
                 badgeHTML = `<div class="result-badge badge-not-found">Not Found</div>`;
             }
 
-            resultsContainer.innerHTML = `
+            const resultCardHTML = `
                 <div class="result-card ${cardClass}">
                     <div class="result-header">
                         <div class="result-title">${statusIcon} ${statusText}</div>
@@ -760,11 +788,18 @@
                     ${notificationHTML}
                 </div>
             `;
+            
+            // Replace loading card with the final result
+            const loadingCard = document.getElementById(`card-${uniqueId}`);
+            if(loadingCard) {
+                loadingCard.outerHTML = resultCardHTML;
+            }
         }
 
         // Display error
         function displayError(error, handle, platform) {
-            resultsContainer.innerHTML = `
+            const uniqueId = `${platform}-${handle}`;
+            const errorCardHTML = `
                 <div class="result-card error">
                     <div class="result-header">
                         <div class="result-title">⚠️ Search Error</div>
@@ -791,13 +826,18 @@
                     </div>
                 </div>
             `;
+             // Replace loading card with the error result
+            const loadingCard = document.getElementById(`card-${uniqueId}`);
+            if(loadingCard) {
+                loadingCard.outerHTML = errorCardHTML;
+            }
         }
 
         // Event handler for save button
-        function handleSaveClick() {
-            const contactInput = document.getElementById('contactInput');
-            const fullNameInput = document.getElementById('fullNameInput');
-            const errorMsg = document.getElementById('contactError');
+        function handleSaveClick(uniqueId) {
+            const contactInput = document.getElementById(`contactInput-${uniqueId}`);
+            const fullNameInput = document.getElementById(`fullNameInput-${uniqueId}`);
+            const errorMsg = document.getElementById(`contactError-${uniqueId}`);
             
             // Reset error states
             errorMsg.classList.remove('show');
@@ -813,7 +853,7 @@
                 return;
             }
             
-            saveProfileWithContact(contactNumber, fullName);
+            saveProfileWithContact(uniqueId, contactNumber, fullName);
         }
 
         // UI update function
@@ -823,20 +863,13 @@
                     searchBtn.disabled = true;
                     btnText.innerHTML = '⏳ Searching...';
                     statusIndicator.style.background = '#ff9800';
-                    
-                    resultsContainer.innerHTML = `
-                        <div class="loading">
-                            <div class="loading-spinner"></div>
-                            <h3>Searching ${currentPlatform}...</h3>
-                            <p>Checking if "${handleInput.value.trim()}" exists and analyzing account type</p>
-                        </div>
-                    `;
                     break;
                     
                 case 'success':
                     searchBtn.disabled = false;
                     btnText.innerHTML = '🔍 Search';
                     statusIndicator.style.background = '#4caf50';
+                    handleInput.value = ''; // Clear input for next search
                     break;
                     
                 case 'error':
@@ -848,8 +881,8 @@
         }
 
         // Utility functions
-        function updateSaveButtonState(isSaving, text) {
-            const saveBtn = document.getElementById('saveBtn');
+        function updateSaveButtonState(isSaving, text, uniqueId) {
+            const saveBtn = document.getElementById(`saveBtn-${uniqueId}`);
             if (saveBtn) {
                 saveBtn.disabled = isSaving;
                 saveBtn.innerHTML = text;
@@ -862,6 +895,7 @@
         }
 
         function formatPhoneNumber(phone) {
+            // Ensure phone number starts with a '+'
             const cleaned = phone.replace(/\D/g, '');
             return phone.startsWith('+') ? `+${cleaned}` : `+${cleaned}`;
         }
@@ -869,13 +903,15 @@
         // Connection check
         async function checkConnection() {
             try {
+                // Using a POST request as specified by the original logic
                 const response = await fetch(config.searchWebhookUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: 'test', platform: 'instagram' })
+                    body: JSON.stringify({ query: 'test', platform: 'instagram', action: 'test' })
                 });
                 
-                if (response.ok || response.status === 405) {
+                // A successful connection could be OK or another status like 405 if POST is required.
+                if (response.ok || response.status === 405 || response.status === 400) {
                     statusIndicator.className = 'status-indicator connected';
                     statusIndicator.title = 'API Status: Connected';
                 } else {
@@ -891,7 +927,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             handleInput.focus();
             checkConnection();
-            setInterval(checkConnection, 30000);
+            setInterval(checkConnection, 30000); // Check connection every 30 seconds
         });
     </script>
 </body>
