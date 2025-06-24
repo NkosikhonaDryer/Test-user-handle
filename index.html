@@ -236,7 +236,7 @@
             100% { transform: rotate(360deg); }
         }
 
-        .results-container {
+        .results-container, #globalSaveContainer {
             margin-top: 20px;
         }
 
@@ -248,15 +248,6 @@
             margin-bottom: 15px;
             transition: all 0.3s ease;
         }
-        
-        .platform-profile {
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            padding: 15px;
-            margin-top: 15px;
-            background-color: #fff;
-        }
-
 
         .result-card.found {
             border-color: #4caf50;
@@ -537,20 +528,25 @@
         </form>
 
         <div id="resultsContainer" class="results-container"></div>
+        
+        <!-- Global Save Container, hidden by default -->
+        <div id="globalSaveContainer" style="display: none;"></div>
+
     </div>
 
     <script>
         // Configuration
         const config = {
             searchWebhookUrl: 'https://n8n-67295956827.africa-south1.run.app/webhook/search-handle',
-            saveWebhookUrl: 'https://n8n-67295956827.africa-south1.run.app/webhook/save-handle',
+            saveWebhookUrl: 'hhttps://n8n-67295956827.africa-south1.run.app/webhook/save-handle',
             timeout: 30000
         };
 
         // State management
-        let currentPlatform = 'instagram';
+        let sessionDataStore = {}; // Stores all successful profile data by uniqueId
+        let successfulSearchCount = 0; // Counter for successful searches
         let isSearching = false;
-        let sessionDataStore = {};
+        let currentPlatform = 'instagram';
 
         // DOM elements
         const platformButtons = document.querySelectorAll('.platform-btn');
@@ -559,6 +555,7 @@
         const searchBtn = document.getElementById('searchBtn');
         const btnText = document.getElementById('btnText');
         const resultsContainer = document.getElementById('resultsContainer');
+        const globalSaveContainer = document.getElementById('globalSaveContainer');
         const statusIndicator = document.getElementById('statusIndicator');
         const clearBtn = document.getElementById('clearBtn');
 
@@ -584,7 +581,10 @@
 
         clearBtn.addEventListener('click', () => {
             resultsContainer.innerHTML = '';
+            globalSaveContainer.innerHTML = '';
+            globalSaveContainer.style.display = 'none';
             sessionDataStore = {};
+            successfulSearchCount = 0;
             handleInput.value = '';
             handleInput.focus();
         });
@@ -620,23 +620,38 @@
                 isSearching = false;
             }
         }
+        
+        async function saveProfile(uniqueId) {
+             const contactInput = document.getElementById(`contactInput-${uniqueId}`);
+             const fullNameInput = document.getElementById(`fullNameInput-${uniqueId}`);
+             const errorMsg = document.getElementById(`contactError-${uniqueId}`);
+            
+             errorMsg.classList.remove('show');
+             contactInput.classList.remove('error');
+            
+             const contactNumber = contactInput.value.trim();
+             const fullName = fullNameInput.value.trim();
+            
+             if (!validatePhoneNumber(contactNumber)) {
+                 contactInput.classList.add('error');
+                 errorMsg.textContent = 'Please enter a valid phone number (7-15 digits, can include +).';
+                 errorMsg.classList.add('show');
+                 return;
+             }
 
-        async function saveProfileWithContact(handle, uniqueId, contactNumber, fullName) {
-            const saveBtn = document.getElementById(`saveBtn-${uniqueId}`);
-            updateSaveButtonState(true, '⏳ Saving...', uniqueId);
+             const profileData = sessionDataStore[uniqueId];
+             if (!profileData) return;
 
-            try {
-                const handleData = sessionDataStore[handle] || {};
-                const instaData = handleData.instagram;
-                const tiktokData = handleData.tiktok;
+             updateSaveButtonState(true, '⏳ Saving...', uniqueId);
 
+             try {
                 const payload = {
-                    Name: fullName || (instaData || tiktokData).nickname,
+                    Name: fullName,
                     ContactNumber: formatPhoneNumber(contactNumber),
-                    TikTokLink: tiktokData ? tiktokData.profileUrl : null,
-                    Instagram_Link: instaData ? instaData.profileUrl : null,
-                    username: handle,
-                    nickname: (instaData || tiktokData).nickname,
+                    TikTokLink: profileData.platform.toLowerCase() === 'tiktok' ? profileData.profileUrl : null,
+                    Instagram_Link: profileData.platform.toLowerCase() === 'instagram' ? profileData.profileUrl : null,
+                    username: profileData.username,
+                    nickname: profileData.nickname,
                     dateAdded: new Date().toISOString(),
                     source: 'handle-search-tool'
                 };
@@ -649,27 +664,96 @@
 
                 if (!response.ok) throw new Error(`Failed to save: ${await response.text()}`);
                 
-                const cardThatSaved = document.getElementById(`card-${uniqueId}`);
-                if (cardThatSaved) {
-                    const contactForm = cardThatSaved.querySelector('.contact-form');
-                    const resultActions = cardThatSaved.querySelector('.result-actions');
-                    if (contactForm) {
-                        contactForm.innerHTML = `<div class="success-message">✅ Profiles for @${handle} saved successfully!</div>`;
-                    }
-                    if (resultActions) {
-                       resultActions.style.display = 'none';
-                    }
+                const card = document.getElementById(`card-${uniqueId}`);
+                if (card) {
+                    const contactForm = card.querySelector('.contact-form');
+                    const actions = card.querySelector('.result-actions');
+                    if (contactForm) contactForm.innerHTML = `<div class="success-message">✅ Profile for @${profileData.username} saved successfully!</div>`;
+                    if (actions) actions.style.display = 'none';
                 }
+
+             } catch (error) {
+                 console.error('Save error:', error);
+                 if (errorMsg) {
+                     errorMsg.textContent = error.message;
+                     errorMsg.classList.add('show');
+                 }
+                 updateSaveButtonState(false, '❌ Save Failed', uniqueId);
+                 setTimeout(() => updateSaveButtonState(false, '💾 Save Profile', uniqueId), 2000);
+             }
+        }
+
+        async function saveAllProfiles() {
+            const contactInput = document.getElementById('globalContactInput');
+            const fullNameInput = document.getElementById('globalFullNameInput');
+            const errorMsg = document.getElementById('globalContactError');
+            
+            errorMsg.classList.remove('show');
+            contactInput.classList.remove('error');
+
+            const contactNumber = contactInput.value.trim();
+            const fullName = fullNameInput.value.trim();
+
+             if (!validatePhoneNumber(contactNumber)) {
+                 contactInput.classList.add('error');
+                 errorMsg.textContent = 'Please enter a valid phone number (7-15 digits, can include +).';
+                 errorMsg.classList.add('show');
+                 return;
+             }
+
+            updateSaveButtonState(true, '⏳ Saving...', 'global');
+
+            try {
+                let instaLink = null;
+                let tiktokLink = null;
+                let primaryNickname = '';
+                let primaryUsername = '';
+
+                Object.values(sessionDataStore).forEach(profile => {
+                    if (profile.platform.toLowerCase() === 'instagram' && !instaLink) {
+                        instaLink = profile.profileUrl;
+                    }
+                    if (profile.platform.toLowerCase() === 'tiktok' && !tiktokLink) {
+                        tiktokLink = profile.profileUrl;
+                    }
+                    if(!primaryNickname) {
+                        primaryNickname = profile.nickname;
+                        primaryUsername = profile.username;
+                    }
+                });
+
+                const payload = {
+                    Name: fullName,
+                    ContactNumber: formatPhoneNumber(contactNumber),
+                    TikTokLink: tiktokLink,
+                    Instagram_Link: instaLink,
+                    username: primaryUsername,
+                    nickname: primaryNickname,
+                    dateAdded: new Date().toISOString(),
+                    source: 'handle-search-tool'
+                };
+                
+                const response = await fetch(config.saveWebhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error(`Failed to save: ${await response.text()}`);
+                
+                globalSaveContainer.innerHTML = `<div class="success-message">✅ All profiles saved successfully!</div>`;
+                // Hide individual contact forms as well
+                 document.querySelectorAll('.contact-form, .result-actions').forEach(el => el.style.display = 'none');
+
 
             } catch (error) {
                 console.error('Save error:', error);
-                const errorMsg = document.getElementById(`contactError-${uniqueId}`);
-                if (errorMsg) {
+                 if (errorMsg) {
                     errorMsg.textContent = error.message;
                     errorMsg.classList.add('show');
-                }
-                updateSaveButtonState(false, '❌ Save Failed', uniqueId);
-                setTimeout(() => updateSaveButtonState(false, '💾 Save Profile(s)', uniqueId), 2000);
+                 }
+                 updateSaveButtonState(false, '❌ Save Failed', 'global');
+                 setTimeout(() => updateSaveButtonState(false, '💾 Save Profile(s)', 'global'), 2000);
             }
         }
         
@@ -689,10 +773,6 @@
         }
 
         function processAndDisplayResults(data, handle, platform, uniqueId) {
-            if (!sessionDataStore[handle]) {
-                sessionDataStore[handle] = {};
-            }
-
             let profileData = null;
             if (data && data.exists) {
                 profileData = {
@@ -703,15 +783,17 @@
                     profileUrl: data.profileUrl || (platform === 'instagram' ? `https://instagram.com/${handle}` : `https://tiktok.com/@${handle}`),
                     exists: true
                 };
-                sessionDataStore[handle][platform] = profileData;
-            } else {
-                 sessionDataStore[handle][platform] = { exists: false, platform: platform };
+                sessionDataStore[uniqueId] = profileData; // Store by unique ID
+                successfulSearchCount++;
             }
 
             renderSeparateCard(profileData, handle, platform, uniqueId);
+            
+            if (successfulSearchCount >= 2) {
+                renderGlobalSave();
+            }
         }
 
-        // UPDATED: Added notification logic for Personal accounts
         function renderSeparateCard(profileData, handle, platform, uniqueId) {
             let card = document.getElementById(`card-${uniqueId}`);
             
@@ -730,132 +812,82 @@
 
                 detailsHTML = `
                     <div class="result-details">
-                        <div class="detail-item">
-                            <span>👤</span>
-                            <span>Name: <span class="detail-value">${nickname}</span></span>
-                        </div>
-                        <div class="detail-item">
-                            <span>📱</span>
-                            <span>Platform: <span class="detail-value">${platformName}</span></span>
-                        </div>
-                        <div class="detail-item">
-                            <span>🏷️</span>
-                            <span>Username: <span class="detail-value">@${username}</span></span>
-                        </div>
-                        <div class="detail-item">
-                            <span>📊</span>
-                            <span>Status: <span class="detail-value">${statusText}</span></span>
-                        </div>
+                        <div class="detail-item"><span>👤</span><span>Name: <span class="detail-value">${nickname}</span></span></div>
+                        <div class="detail-item"><span>📱</span><span>Platform: <span class="detail-value">${platformName}</span></span></div>
+                        <div class="detail-item"><span>🏷️</span><span>Username: <span class="detail-value">@${username}</span></span></div>
+                        <div class="detail-item"><span>📊</span><span>Status: <span class="detail-value">${statusText}</span></span></div>
                     </div>
                     <div class="result-actions" style="justify-content: flex-start; margin-top: 0; margin-bottom: 15px;">
                          <a href="${profileUrl}" target="_blank" class="action-btn btn-secondary">🔗 View Profile</a>
                     </div>
                 `;
 
-                const isInstaPersonal = platform === 'instagram' && accountType === 'Personal';
-                const saveDisabledAttr = isInstaPersonal ? 'disabled' : '';
-                const saveDisabledTitle = isInstaPersonal ? 'Cannot save Personal Instagram accounts.' : 'Save all found profiles for this user';
-                
-                // ADDED: Notification logic for Personal accounts
                 if (accountType === 'Personal') {
                     const instructionUrl = platform === 'instagram' 
                         ? 'https://help.instagram.com/502981923235522'
                         : 'https://support.tiktok.com/en/business-and-creator/creator-and-business-accounts/business-account-on-tiktok';
-                    
-                    notificationHTML = `
-                        <div class="notification">
-                            <div class="notification-icon">💡</div>
-                            <div class="notification-content">
-                                <div class="notification-title">Switch to Professional Account</div>
-                                <div class="notification-text">
-                                    This is a Personal account. To unlock more features and analytics, consider switching to a professional account.
-                                </div>
-                                <a href="${instructionUrl}" target="_blank" class="notification-link">
-                                    📚 View ${platformName} Instructions
-                                    <span>↗</span>
-                                </a>
-                            </div>
-                        </div>
-                    `;
+                    notificationHTML = `<div class="notification"><div class="notification-icon">💡</div><div class="notification-content"><div class="notification-title">Switch to Professional Account</div><div class="notification-text">This is a Personal account. To unlock more features and analytics, consider switching to a professional account.</div><a href="${instructionUrl}" target="_blank" class="notification-link">📚 View ${platformName} Instructions<span>↗</span></a></div></div>`;
                 }
                 
-                contactFormHTML = `
-                    <div class="contact-form" id="contactForm-${uniqueId}">
-                        <h3>📞 Add Contact Information</h3>
-                        <div class="contact-input-group">
-                            <input type="text" class="contact-input" placeholder="Full Name" id="fullNameInput-${uniqueId}" value="${nickname}">
-                            <input type="tel" class="contact-input" placeholder="Phone Number" id="contactInput-${uniqueId}" required>
-                        </div>
-                        <div class="error-message" id="contactError-${uniqueId}"></div>
-                    </div>
-                `;
-                actionsHTML = `
-                    <div class="result-actions" id="resultActions-${uniqueId}">
-                        <button onclick="handleSaveClick('${handle}', '${uniqueId}')" class="action-btn btn-save" id="saveBtn-${uniqueId}" ${saveDisabledAttr} title="${saveDisabledTitle}">
-                            💾 Save Profile(s)
-                        </button>
-                    </div>
-                `;
+                const isInstaPersonal = platform === 'instagram' && accountType === 'Personal';
+                const saveDisabledAttr = isInstaPersonal ? 'disabled' : '';
+                const saveDisabledTitle = isInstaPersonal ? 'Cannot save Personal Instagram accounts.' : 'Save this profile';
+
+                // This section is for single-profile save
+                contactFormHTML = `<div class="contact-form" id="contactForm-${uniqueId}"><h3>📞 Add Contact Information</h3><div class="contact-input-group"><input type="text" class="contact-input" placeholder="Full Name" id="fullNameInput-${uniqueId}" value="${nickname}"><input type="tel" class="contact-input" placeholder="Phone Number" id="contactInput-${uniqueId}" required></div><div class="error-message" id="contactError-${uniqueId}"></div></div>`;
+                actionsHTML = `<div class="result-actions" id="resultActions-${uniqueId}"><button onclick="saveProfile('${uniqueId}')" class="action-btn btn-save" id="saveBtn-${uniqueId}" ${saveDisabledAttr} title="${saveDisabledTitle}">💾 Save Profile</button></div>`;
 
             } else {
                  badgeHTML = `<div class="result-badge badge-not-found">Not Found</div>`;
             }
 
-            const cardHTML = `
-                 <div class="result-card ${cardClass}" id="card-${uniqueId}">
-                    <div class="result-header">
-                        <div class="result-title">${statusIcon} ${statusText}</div>
-                         ${badgeHTML}
+            const cardHTML = `<div class="result-card ${cardClass}" id="card-${uniqueId}"><div class="result-header"><div class="result-title">${statusIcon} ${statusText}</div>${badgeHTML}</div>${detailsHTML}${notificationHTML}${contactFormHTML}${actionsHTML}</div>`;
+            
+            if (card) { card.outerHTML = cardHTML; }
+            else { resultsContainer.insertAdjacentHTML('beforeend', cardHTML); }
+        }
+        
+        function renderGlobalSave() {
+            // Hide individual save sections from all cards
+            document.querySelectorAll('.contact-form, .result-actions').forEach(el => {
+                el.style.display = 'none';
+            });
+            
+            const firstProfile = Object.values(sessionDataStore)[0];
+            const mainNickname = firstProfile ? firstProfile.nickname : "";
+            
+            // Check if any of the found profiles are a personal Instagram account
+            const isAnyInstaPersonal = Object.values(sessionDataStore).some(p => p.platform.toLowerCase() === 'instagram' && p.accountType === 'Personal');
+            const saveDisabledAttr = isAnyInstaPersonal ? 'disabled' : '';
+            const saveDisabledTitle = isAnyInstaPersonal ? 'Cannot save because a Personal Instagram account was found.' : 'Save all found profiles';
+            
+            const globalSaveHTML = `
+                <div class="result-card found">
+                    <div class="contact-form" id="contactForm-global">
+                        <h3>📞 Add Contact to Save All Profiles</h3>
+                        <div class="contact-input-group">
+                            <input type="text" class="contact-input" placeholder="Full Name" id="globalFullNameInput" value="${mainNickname}">
+                            <input type="tel" class="contact-input" placeholder="Phone Number" id="globalContactInput" required>
+                        </div>
+                        <div class="error-message" id="globalContactError"></div>
                     </div>
-                    ${detailsHTML}
-                    ${notificationHTML}
-                    ${contactFormHTML}
-                    ${actionsHTML}
+                    <div class="result-actions" id="resultActions-global">
+                        <button onclick="saveAllProfiles()" class="action-btn btn-save" id="globalSaveBtn" ${saveDisabledAttr} title="${saveDisabledTitle}">
+                            💾 Save Profile(s)
+                        </button>
+                    </div>
                 </div>
             `;
             
-            if (card) {
-                card.outerHTML = cardHTML;
-            } else {
-                resultsContainer.insertAdjacentHTML('beforeend', cardHTML);
-            }
+            globalSaveContainer.innerHTML = globalSaveHTML;
+            globalSaveContainer.style.display = 'block';
         }
-        
 
         function displayError(error, handle, platform, uniqueId) {
             let card = document.getElementById(`card-${uniqueId}`);
-            const errorCardHTML = `
-                <div class="result-card error" id="card-${uniqueId}">
-                    <div class="result-header"> <div class="result-title">⚠️ Search Error for @${handle} on ${platform}</div> </div>
-                    <p style="margin: 15px 0; color: #666;"><strong>Error:</strong> ${error}</p>
-                    <div class="result-actions">
-                        <button onclick="searchHandle('${handle}', '${platform}')" class="action-btn btn-primary">🔄 Try Again</button>
-                    </div>
-                </div>
-            `;
+            const errorCardHTML = `<div class="result-card error" id="card-${uniqueId}"><div class="result-header"> <div class="result-title">⚠️ Search Error for @${handle} on ${platform}</div> </div><p style="margin: 15px 0; color: #666;"><strong>Error:</strong> ${error}</p><div class="result-actions"><button onclick="searchHandle('${handle}', '${platform}')" class="action-btn btn-primary">🔄 Try Again</button></div></div>`;
             if (card) { card.outerHTML = errorCardHTML; }
             else { resultsContainer.insertAdjacentHTML('beforeend', errorCardHTML); }
-        }
-
-        function handleSaveClick(handle, uniqueId) {
-            const contactInput = document.getElementById(`contactInput-${uniqueId}`);
-            const fullNameInput = document.getElementById(`fullNameInput-${uniqueId}`);
-            const errorMsg = document.getElementById(`contactError-${uniqueId}`);
-            
-            errorMsg.classList.remove('show');
-            contactInput.classList.remove('error');
-            
-            const contactNumber = contactInput.value.trim();
-            const fullName = fullNameInput.value.trim();
-            
-            if (!validatePhoneNumber(contactNumber)) {
-                contactInput.classList.add('error');
-                errorMsg.textContent = 'Please enter a valid phone number (7-15 digits, can include +).';
-                errorMsg.classList.add('show');
-                return;
-            }
-            
-            saveProfileWithContact(handle, uniqueId, contactNumber, fullName);
         }
 
         function updateUI(state) {
@@ -879,8 +911,8 @@
             }
         }
 
-        function updateSaveButtonState(isSaving, text, uniqueId) {
-            const saveBtn = document.getElementById(`saveBtn-${uniqueId}`);
+        function updateSaveButtonState(isSaving, text, id) {
+            const saveBtn = document.getElementById(id === 'global' ? 'globalSaveBtn' : `saveBtn-${id}`);
             if (saveBtn) {
                 saveBtn.disabled = isSaving;
                 saveBtn.innerHTML = text;
