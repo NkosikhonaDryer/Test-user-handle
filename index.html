@@ -288,7 +288,7 @@
             text-transform: uppercase;
         }
 
-        .badge-business {
+        .badge-professional {
             background: #2196f3;
             color: white;
         }
@@ -389,6 +389,11 @@
             display: flex;
             align-items: flex-start;
             gap: 10px;
+        }
+
+        .notification.instagram-warning {
+             border-left-color: #f44336;
+             background: linear-gradient(135deg, #ffebee, #ffcdd2);
         }
 
         .notification-icon {
@@ -529,7 +534,6 @@
 
         <div id="resultsContainer" class="results-container"></div>
         
-        <!-- Global Save Container, hidden by default -->
         <div id="globalSaveContainer" style="display: none;"></div>
 
     </div>
@@ -742,8 +746,7 @@
                 if (!response.ok) throw new Error(`Failed to save: ${await response.text()}`);
                 
                 globalSaveContainer.innerHTML = `<div class="success-message">✅ All profiles saved successfully!</div>`;
-                // Hide individual contact forms as well
-                 document.querySelectorAll('.contact-form, .result-actions').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.contact-form, .result-actions').forEach(el => el.style.display = 'none');
 
 
             } catch (error) {
@@ -783,8 +786,10 @@
                     profileUrl: data.profileUrl || (platform === 'instagram' ? `https://instagram.com/${handle}` : `https://tiktok.com/@${handle}`),
                     exists: true
                 };
-                sessionDataStore[uniqueId] = profileData; // Store by unique ID
-                successfulSearchCount++;
+                if (!sessionDataStore[uniqueId]) { // Only count if it's a new successful search
+                    successfulSearchCount++;
+                }
+                sessionDataStore[uniqueId] = profileData;
             }
 
             renderSeparateCard(profileData, handle, platform, uniqueId);
@@ -807,8 +812,9 @@
 
             if (exists) {
                 const { nickname, accountType, profileUrl, username } = profileData;
-                const badgeClass = accountType === 'Business' ? 'badge-business' : 'badge-personal';
-                badgeHTML = `<div class="result-badge ${badgeClass}">${accountType}</div>`;
+                const badgeClass = accountType === 'Business' ? 'badge-professional' : 'badge-personal';
+                const displayText = accountType === 'Business' ? 'Professional' : accountType;
+                badgeHTML = `<div class="result-badge ${badgeClass}">${displayText}</div>`;
 
                 detailsHTML = `
                     <div class="result-details">
@@ -821,19 +827,20 @@
                          <a href="${profileUrl}" target="_blank" class="action-btn btn-secondary">🔗 View Profile</a>
                     </div>
                 `;
-
+                
                 if (accountType === 'Personal') {
-                    const instructionUrl = platform === 'instagram' 
+                    const isInstagram = platform.toLowerCase() === 'instagram';
+                    const notificationClass = isInstagram ? 'notification instagram-warning' : 'notification';
+                    const instructionUrl = isInstagram 
                         ? 'https://help.instagram.com/502981923235522'
                         : 'https://support.tiktok.com/en/business-and-creator/creator-and-business-accounts/business-account-on-tiktok';
-                    notificationHTML = `<div class="notification"><div class="notification-icon">💡</div><div class="notification-content"><div class="notification-title">Switch to Professional Account</div><div class="notification-text">This is a Personal account. To unlock more features and analytics, consider switching to a professional account.</div><a href="${instructionUrl}" target="_blank" class="notification-link">📚 View ${platformName} Instructions<span>↗</span></a></div></div>`;
+                    notificationHTML = `<div class="${notificationClass}"><div class="notification-icon">💡</div><div class="notification-content"><div class="notification-title">Switch to Professional Account</div><div class="notification-text">This is a Personal account. To unlock more features and analytics, consider switching to a professional account.</div><a href="${instructionUrl}" target="_blank" class="notification-link">📚 View ${platformName} Instructions<span>↗</span></a></div></div>`;
                 }
                 
                 const isInstaPersonal = platform === 'instagram' && accountType === 'Personal';
                 const saveDisabledAttr = isInstaPersonal ? 'disabled' : '';
                 const saveDisabledTitle = isInstaPersonal ? 'Cannot save Personal Instagram accounts.' : 'Save this profile';
 
-                // This section is for single-profile save
                 contactFormHTML = `<div class="contact-form" id="contactForm-${uniqueId}"><h3>📞 Add Contact Information</h3><div class="contact-input-group"><input type="text" class="contact-input" placeholder="Full Name" id="fullNameInput-${uniqueId}" value="${nickname}"><input type="tel" class="contact-input" placeholder="Phone Number" id="contactInput-${uniqueId}" required></div><div class="error-message" id="contactError-${uniqueId}"></div></div>`;
                 actionsHTML = `<div class="result-actions" id="resultActions-${uniqueId}"><button onclick="saveProfile('${uniqueId}')" class="action-btn btn-save" id="saveBtn-${uniqueId}" ${saveDisabledAttr} title="${saveDisabledTitle}">💾 Save Profile</button></div>`;
 
@@ -848,7 +855,6 @@
         }
         
         function renderGlobalSave() {
-            // Hide individual save sections from all cards
             document.querySelectorAll('.contact-form, .result-actions').forEach(el => {
                 el.style.display = 'none';
             });
@@ -856,7 +862,6 @@
             const firstProfile = Object.values(sessionDataStore)[0];
             const mainNickname = firstProfile ? firstProfile.nickname : "";
             
-            // Check if any of the found profiles are a personal Instagram account
             const isAnyInstaPersonal = Object.values(sessionDataStore).some(p => p.platform.toLowerCase() === 'instagram' && p.accountType === 'Personal');
             const saveDisabledAttr = isAnyInstaPersonal ? 'disabled' : '';
             const saveDisabledTitle = isAnyInstaPersonal ? 'Cannot save because a Personal Instagram account was found.' : 'Save all found profiles';
