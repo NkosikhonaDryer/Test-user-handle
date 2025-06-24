@@ -118,6 +118,28 @@
             background: #5a67d8;
             transform: translateY(-2px);
         }
+        
+        /* NEW: Styles for the Clear button */
+        .clear-btn {
+            padding: 16px 20px;
+            background: #f0f0f0;
+            color: #555;
+            border: 2px solid #e0e0e0;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .clear-btn:hover {
+            background: #e0e0e0;
+            border-color: #ccc;
+            transform: translateY(-2px);
+        }
+
 
         .search-btn:disabled {
             background: #ccc;
@@ -131,7 +153,6 @@
             border-radius: 15px;
             padding: 20px;
             margin: 20px 0;
-            /* Initially hidden, shown via script */
             display: block; 
             animation: slideIn 0.3s ease-out;
         }
@@ -502,6 +523,10 @@
             <button type="submit" class="search-btn" id="searchBtn">
                 <span id="btnText">🔍 Search</span>
             </button>
+            <!-- NEW: Clear button to start a fresh search -->
+            <button type="button" class="clear-btn" id="clearBtn" title="Clear all results">
+                <span>🧹 Clear</span>
+            </button>
         </form>
 
         <div id="resultsContainer" class="results-container"></div>
@@ -518,7 +543,6 @@
         // State management
         let currentPlatform = 'instagram';
         let isSearching = false;
-        // NEW: sessionDataStore now caches all searches by a unique key 'platform-handle'
         let sessionDataStore = {};
 
         // DOM elements
@@ -529,6 +553,8 @@
         const btnText = document.getElementById('btnText');
         const resultsContainer = document.getElementById('resultsContainer');
         const statusIndicator = document.getElementById('statusIndicator');
+        // NEW: Reference to the clear button
+        const clearBtn = document.getElementById('clearBtn');
 
         // Event listeners
         platformButtons.forEach(btn => {
@@ -540,9 +566,6 @@
                 const platformName = currentPlatform.charAt(0).toUpperCase() + currentPlatform.slice(1);
                 const examples = currentPlatform === 'instagram' ? 'nike, spotify' : 'mrbeast, charlidamelio';
                 handleInput.placeholder = `Enter ${platformName} username (e.g., ${examples})`;
-                
-                // REMOVED: No longer clearing results on platform switch to allow multiple results to be shown.
-                // resultsContainer.innerHTML = ''; 
             });
         });
 
@@ -553,12 +576,24 @@
             searchHandle(handle, currentPlatform);
         });
 
+        // NEW: Event listener for the clear button
+        clearBtn.addEventListener('click', () => {
+            // Clear the results from the UI
+            resultsContainer.innerHTML = '';
+            // Reset the session data cache
+            sessionDataStore = {};
+            // Clear the input field for the user
+            handleInput.value = '';
+            // Focus on the input field to make it easy to start a new search
+            handleInput.focus();
+        });
+
+
         // Core search function
         async function searchHandle(handle, platform) {
             if (isSearching) return;
             
             isSearching = true;
-            // A temporary loading card will be added
             displayLoadingCard(handle, platform);
             updateUI('searching');
             
@@ -581,13 +616,11 @@
                 }
 
                 const data = await response.json();
-                // Replace loading card with the actual result card
                 displayResults(data, handle, platform);
                 updateUI('success');
                 
             } catch (error) {
                 console.error('Search error:', error);
-                // Replace loading card with an error card
                 displayError(error.message, handle, platform);
                 updateUI('error');
             } finally {
@@ -603,7 +636,6 @@
             try {
                 const [platform, handle] = uniqueId.split('-');
 
-                // Get all data for the handle
                 const instaData = sessionDataStore[`instagram-${handle}`];
                 const tiktokData = sessionDataStore[`tiktok-${handle}`];
 
@@ -653,7 +685,6 @@
             }
         }
         
-        // Function to show a temporary loading card
         function displayLoadingCard(handle, platform) {
             const uniqueId = `${platform}-${handle}`;
             const loadingCardHTML = `
@@ -665,7 +696,6 @@
                     </div>
                 </div>
             `;
-            // Remove previous loading card if it exists
             const existingLoading = document.querySelector('.loading-card');
             if(existingLoading) existingLoading.remove();
 
@@ -688,7 +718,6 @@
                     profileUrl: data.profileUrl || (platform === 'instagram' ? `https://instagram.com/${handle}` : `https://tiktok.com/@${handle}`)
                 };
                 
-                // Store successful search result in cache
                 sessionDataStore[uniqueId] = currentProfileData;
             }
 
@@ -724,7 +753,6 @@
                     </div>
                 `;
                 
-                // NEW: Conditionally disable save button for Personal Instagram accounts
                 const isInstaPersonal = platform === 'instagram' && accountType === 'Personal';
                 const saveDisabledAttr = isInstaPersonal ? 'disabled' : '';
                 const saveDisabledTitle = isInstaPersonal ? 'Cannot save a Personal Instagram account.' : 'Save profile with contact';
@@ -789,14 +817,12 @@
                 </div>
             `;
             
-            // Replace loading card with the final result
             const loadingCard = document.getElementById(`card-${uniqueId}`);
             if(loadingCard) {
                 loadingCard.outerHTML = resultCardHTML;
             }
         }
 
-        // Display error
         function displayError(error, handle, platform) {
             const uniqueId = `${platform}-${handle}`;
             const errorCardHTML = `
@@ -826,20 +852,17 @@
                     </div>
                 </div>
             `;
-             // Replace loading card with the error result
             const loadingCard = document.getElementById(`card-${uniqueId}`);
             if(loadingCard) {
                 loadingCard.outerHTML = errorCardHTML;
             }
         }
 
-        // Event handler for save button
         function handleSaveClick(uniqueId) {
             const contactInput = document.getElementById(`contactInput-${uniqueId}`);
             const fullNameInput = document.getElementById(`fullNameInput-${uniqueId}`);
             const errorMsg = document.getElementById(`contactError-${uniqueId}`);
             
-            // Reset error states
             errorMsg.classList.remove('show');
             contactInput.classList.remove('error');
             
@@ -856,7 +879,6 @@
             saveProfileWithContact(uniqueId, contactNumber, fullName);
         }
 
-        // UI update function
         function updateUI(state) {
             switch (state) {
                 case 'searching':
@@ -869,7 +891,7 @@
                     searchBtn.disabled = false;
                     btnText.innerHTML = '🔍 Search';
                     statusIndicator.style.background = '#4caf50';
-                    handleInput.value = ''; // Clear input for next search
+                    handleInput.value = '';
                     break;
                     
                 case 'error':
@@ -880,7 +902,6 @@
             }
         }
 
-        // Utility functions
         function updateSaveButtonState(isSaving, text, uniqueId) {
             const saveBtn = document.getElementById(`saveBtn-${uniqueId}`);
             if (saveBtn) {
@@ -895,22 +916,18 @@
         }
 
         function formatPhoneNumber(phone) {
-            // Ensure phone number starts with a '+'
             const cleaned = phone.replace(/\D/g, '');
             return phone.startsWith('+') ? `+${cleaned}` : `+${cleaned}`;
         }
 
-        // Connection check
         async function checkConnection() {
             try {
-                // Using a POST request as specified by the original logic
                 const response = await fetch(config.searchWebhookUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ query: 'test', platform: 'instagram', action: 'test' })
                 });
                 
-                // A successful connection could be OK or another status like 405 if POST is required.
                 if (response.ok || response.status === 405 || response.status === 400) {
                     statusIndicator.className = 'status-indicator connected';
                     statusIndicator.title = 'API Status: Connected';
@@ -923,11 +940,10 @@
             }
         }
 
-        // Initialize application
         document.addEventListener('DOMContentLoaded', () => {
             handleInput.focus();
             checkConnection();
-            setInterval(checkConnection, 30000); // Check connection every 30 seconds
+            setInterval(checkConnection, 30000);
         });
     </script>
 </body>
