@@ -119,7 +119,6 @@
             transform: translateY(-2px);
         }
         
-        /* NEW: Styles for the Clear button */
         .clear-btn {
             padding: 16px 20px;
             background: #f0f0f0;
@@ -249,6 +248,15 @@
             margin-bottom: 15px;
             transition: all 0.3s ease;
         }
+        
+        .platform-profile {
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            background-color: #fff;
+        }
+
 
         .result-card.found {
             border-color: #4caf50;
@@ -523,7 +531,6 @@
             <button type="submit" class="search-btn" id="searchBtn">
                 <span id="btnText">🔍 Search</span>
             </button>
-            <!-- NEW: Clear button to start a fresh search -->
             <button type="button" class="clear-btn" id="clearBtn" title="Clear all results">
                 <span>🧹 Clear</span>
             </button>
@@ -535,8 +542,8 @@
     <script>
         // Configuration
         const config = {
-            searchWebhookUrl: 'https://n8n-67295956827.africa-south1.run.app/webhook-test/search-handle',
-            saveWebhookUrl: 'https://n8n-67295956827.africa-south1.run.app/webhook-test/save-handle',
+            searchWebhookUrl: 'https://n8n-67295956827.africa-south1.run.app/webhook/search-handle',
+            saveWebhookUrl: 'https://n8n-67295956827.africa-south1.run.app/webhook/save-handle',
             timeout: 30000
         };
 
@@ -553,7 +560,6 @@
         const btnText = document.getElementById('btnText');
         const resultsContainer = document.getElementById('resultsContainer');
         const statusIndicator = document.getElementById('statusIndicator');
-        // NEW: Reference to the clear button
         const clearBtn = document.getElementById('clearBtn');
 
         // Event listeners
@@ -576,15 +582,10 @@
             searchHandle(handle, currentPlatform);
         });
 
-        // NEW: Event listener for the clear button
         clearBtn.addEventListener('click', () => {
-            // Clear the results from the UI
             resultsContainer.innerHTML = '';
-            // Reset the session data cache
             sessionDataStore = {};
-            // Clear the input field for the user
             handleInput.value = '';
-            // Focus on the input field to make it easy to start a new search
             handleInput.focus();
         });
 
@@ -594,50 +595,41 @@
             if (isSearching) return;
             
             isSearching = true;
-            displayLoadingCard(handle, platform);
+            const uniqueId = `${platform}-${handle}`;
+            displayLoadingCard(handle, platform, uniqueId);
             updateUI('searching');
             
             try {
                 const response = await fetch(config.searchWebhookUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        query: handle,
-                        platform: platform,
-                        action: 'search'
-                    })
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ query: handle, platform: platform, action: 'search' })
                 });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
                 const data = await response.json();
-                displayResults(data, handle, platform);
+                processAndDisplayResults(data, handle, platform, uniqueId);
                 updateUI('success');
                 
             } catch (error) {
                 console.error('Search error:', error);
-                displayError(error.message, handle, platform);
+                displayError(error.message, handle, platform, uniqueId);
                 updateUI('error');
             } finally {
                 isSearching = false;
             }
         }
 
-        // Save profile with contact information
-        async function saveProfileWithContact(uniqueId, contactNumber, fullName) {
+        // UPDATED: Save function now takes handle and uniqueId to update the correct card
+        async function saveProfileWithContact(handle, uniqueId, contactNumber, fullName) {
             const saveBtn = document.getElementById(`saveBtn-${uniqueId}`);
             updateSaveButtonState(true, '⏳ Saving...', uniqueId);
 
             try {
-                const [platform, handle] = uniqueId.split('-');
-
-                const instaData = sessionDataStore[`instagram-${handle}`];
-                const tiktokData = sessionDataStore[`tiktok-${handle}`];
+                const handleData = sessionDataStore[handle] || {};
+                const instaData = handleData.instagram;
+                const tiktokData = handleData.tiktok;
 
                 const payload = {
                     Name: fullName || (instaData || tiktokData).nickname,
@@ -652,26 +644,25 @@
                 
                 const response = await fetch(config.saveWebhookUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                     body: JSON.stringify(payload)
                 });
 
-                if (!response.ok) {
-                    throw new Error(`Failed to save: ${await response.text()}`);
-                }
+                if (!response.ok) throw new Error(`Failed to save: ${await response.text()}`);
                 
-                const contactForm = document.getElementById(`contactForm-${uniqueId}`);
-                const resultActions = document.getElementById(`resultActions-${uniqueId}`);
-                
-                if (contactForm) {
-                    contactForm.innerHTML = `<div class="success-message">✅ Profile for @${handle} saved successfully!</div>`;
+                // Update the specific card that triggered the save
+                const cardThatSaved = document.getElementById(`card-${uniqueId}`);
+                if (cardThatSaved) {
+                    const contactForm = cardThatSaved.querySelector('.contact-form');
+                    const resultActions = cardThatSaved.querySelector('.result-actions');
+                    if (contactForm) {
+                        contactForm.innerHTML = `<div class="success-message">✅ Profiles for @${handle} saved successfully!</div>`;
+                    }
+                    if (resultActions) {
+                       resultActions.style.display = 'none';
+                    }
                 }
-                if (resultActions) {
-                    resultActions.style.display = 'none';
-                }
+
 
             } catch (error) {
                 console.error('Save error:', error);
@@ -681,54 +672,64 @@
                     errorMsg.classList.add('show');
                 }
                 updateSaveButtonState(false, '❌ Save Failed', uniqueId);
-                setTimeout(() => updateSaveButtonState(false, '💾 Save with Contact', uniqueId), 2000);
+                setTimeout(() => updateSaveButtonState(false, '💾 Save Profile(s)', uniqueId), 2000);
             }
         }
         
-        function displayLoadingCard(handle, platform) {
-            const uniqueId = `${platform}-${handle}`;
+        function displayLoadingCard(handle, platform, uniqueId) {
+            let card = document.getElementById(`card-${uniqueId}`);
+             if(card) card.remove(); // Remove if a previous search for this exact platform failed and is being retried.
+            
             const loadingCardHTML = `
-                <div class="result-card" id="card-${uniqueId}">
+                <div class="result-card loading-card" id="card-${uniqueId}">
                     <div class="loading">
                         <div class="loading-spinner"></div>
                         <h3>Searching ${platform} for @${handle}...</h3>
-                        <p>Analyzing account details...</p>
                     </div>
                 </div>
             `;
-            const existingLoading = document.querySelector('.loading-card');
-            if(existingLoading) existingLoading.remove();
-
             resultsContainer.insertAdjacentHTML('beforeend', loadingCardHTML);
-            document.getElementById(`card-${uniqueId}`).classList.add('loading-card');
         }
 
-        // Display search results
-        function displayResults(data, handle, platform) {
-            const uniqueId = `${platform}-${handle}`;
-            const exists = data && data.exists;
-            let currentProfileData = null;
+        // UPDATED: Now creates a separate card for each search result
+        function processAndDisplayResults(data, handle, platform, uniqueId) {
+            if (!sessionDataStore[handle]) {
+                sessionDataStore[handle] = {};
+            }
 
-            if (exists) {
-                currentProfileData = {
+            let profileData = null;
+            if (data && data.exists) {
+                profileData = {
                     platform: data.platform || platform.charAt(0).toUpperCase() + platform.slice(1),
                     username: data.username || handle,
                     nickname: data.title || data.displayName || handle,
                     accountType: data.accountType || 'Personal',
-                    profileUrl: data.profileUrl || (platform === 'instagram' ? `https://instagram.com/${handle}` : `https://tiktok.com/@${handle}`)
+                    profileUrl: data.profileUrl || (platform === 'instagram' ? `https://instagram.com/${handle}` : `https://tiktok.com/@${handle}`),
+                    exists: true
                 };
-                
-                sessionDataStore[uniqueId] = currentProfileData;
+                sessionDataStore[handle][platform] = profileData;
+            } else {
+                 sessionDataStore[handle][platform] = { exists: false, platform: platform };
             }
 
+            renderSeparateCard(profileData, handle, platform, uniqueId);
+        }
+
+        // NEW: Renders a single card for a specific platform search
+        function renderSeparateCard(profileData, handle, platform, uniqueId) {
+            let card = document.getElementById(`card-${uniqueId}`);
+            
+            const exists = profileData && profileData.exists;
             const cardClass = exists ? 'found' : 'not-found';
             const statusIcon = exists ? '✅' : '❌';
             const statusText = exists ? 'Handle Exists' : 'Handle Does Not Exist';
+            const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
+            const platformIcon = platform === 'instagram' ? '📷' : '🎵';
             
-            let detailsHTML = '', contactFormHTML = '', actionsHTML = '', badgeHTML = '', notificationHTML = '';
+            let detailsHTML = '', contactFormHTML = '', actionsHTML = '', badgeHTML = '';
 
             if (exists) {
-                const accountType = currentProfileData.accountType;
+                const { nickname, accountType, profileUrl } = profileData;
                 const badgeClass = accountType === 'Business' ? 'badge-business' : 'badge-personal';
                 badgeHTML = `<div class="result-badge ${badgeClass}">${accountType}</div>`;
 
@@ -736,129 +737,77 @@
                     <div class="result-details">
                         <div class="detail-item">
                             <span>👤</span>
-                            <span>Name: <span class="detail-value">${currentProfileData.nickname}</span></span>
+                            <span>Name: <span class="detail-value">${nickname}</span></span>
                         </div>
                         <div class="detail-item">
-                            <span>📱</span>
-                            <span>Platform: <span class="detail-value">${currentProfileData.platform}</span></span>
-                        </div>
-                        <div class="detail-item">
-                            <span>🏷️</span>
-                            <span>Username: <span class="detail-value">@${currentProfileData.username}</span></span>
-                        </div>
-                        <div class="detail-item">
-                            <span>📊</span>
-                            <span>Status: <span class="detail-value">${statusText}</span></span>
+                            <span>🔗</span>
+                            <span><a href="${profileUrl}" target="_blank" class="notification-link">View Profile <span>↗</span></a></span>
                         </div>
                     </div>
                 `;
-                
+
                 const isInstaPersonal = platform === 'instagram' && accountType === 'Personal';
                 const saveDisabledAttr = isInstaPersonal ? 'disabled' : '';
-                const saveDisabledTitle = isInstaPersonal ? 'Cannot save a Personal Instagram account.' : 'Save profile with contact';
-
+                const saveDisabledTitle = isInstaPersonal ? 'Cannot save Personal Instagram accounts.' : 'Save all found profiles for this user';
+                
                 contactFormHTML = `
                     <div class="contact-form" id="contactForm-${uniqueId}">
                         <h3>📞 Add Contact Information</h3>
                         <div class="contact-input-group">
-                            <input type="text" class="contact-input" placeholder="Full Name" id="fullNameInput-${uniqueId}" value="${currentProfileData.nickname}">
-                            <input type="tel" class="contact-input" placeholder="Phone Number (e.g., +1234567890)" id="contactInput-${uniqueId}" required>
+                            <input type="text" class="contact-input" placeholder="Full Name" id="fullNameInput-${uniqueId}" value="${nickname}">
+                            <input type="tel" class="contact-input" placeholder="Phone Number" id="contactInput-${uniqueId}" required>
                         </div>
                         <div class="error-message" id="contactError-${uniqueId}"></div>
                     </div>
                 `;
-                
                 actionsHTML = `
                     <div class="result-actions" id="resultActions-${uniqueId}">
-                        <a href="${currentProfileData.profileUrl}" target="_blank" class="action-btn btn-secondary">
-                            🔗 View Profile
-                        </a>
-                        <button onclick="handleSaveClick('${uniqueId}')" class="action-btn btn-save" id="saveBtn-${uniqueId}" ${saveDisabledAttr} title="${saveDisabledTitle}">
-                            💾 Save with Contact
+                        <button onclick="handleSaveClick('${handle}', '${uniqueId}')" class="action-btn btn-save" id="saveBtn-${uniqueId}" ${saveDisabledAttr} title="${saveDisabledTitle}">
+                            💾 Save Profile(s)
                         </button>
                     </div>
                 `;
 
-                if (accountType === 'Personal') {
-                    const instructionUrl = currentProfileData.platform === 'Instagram' 
-                        ? 'https://help.instagram.com/502981923235522'
-                        : 'https://support.tiktok.com/en/business-and-creator/creator-and-business-accounts/business-account-on-tiktok';
-                    
-                    notificationHTML = `
-                        <div class="notification">
-                            <div class="notification-icon">💡</div>
-                            <div class="notification-content">
-                                <div class="notification-title">Switch to Professional Account</div>
-                                <div class="notification-text">
-                                    Consider switching to a professional account to unlock advanced features, analytics, and business tools.
-                                </div>
-                                <a href="${instructionUrl}" target="_blank" class="notification-link">
-                                    📚 View ${currentProfileData.platform} Instructions
-                                    <span>↗</span>
-                                </a>
-                            </div>
-                        </div>
-                    `;
-                }
             } else {
-                badgeHTML = `<div class="result-badge badge-not-found">Not Found</div>`;
+                 badgeHTML = `<div class="result-badge badge-not-found">Not Found</div>`;
             }
 
-            const resultCardHTML = `
-                <div class="result-card ${cardClass}">
+            const cardHTML = `
+                 <div class="result-card ${cardClass}" id="card-${uniqueId}">
                     <div class="result-header">
-                        <div class="result-title">${statusIcon} ${statusText}</div>
-                        ${badgeHTML}
+                        <div class="result-title">${platformIcon} ${platformName} Result for @${handle}</div>
+                         ${badgeHTML}
                     </div>
                     ${detailsHTML}
                     ${contactFormHTML}
                     ${actionsHTML}
-                    ${notificationHTML}
                 </div>
             `;
             
-            const loadingCard = document.getElementById(`card-${uniqueId}`);
-            if(loadingCard) {
-                loadingCard.outerHTML = resultCardHTML;
+            if (card) {
+                card.outerHTML = cardHTML;
+            } else {
+                resultsContainer.insertAdjacentHTML('beforeend', cardHTML);
             }
         }
+        
 
-        function displayError(error, handle, platform) {
-            const uniqueId = `${platform}-${handle}`;
+        function displayError(error, handle, platform, uniqueId) {
+            let card = document.getElementById(`card-${uniqueId}`);
             const errorCardHTML = `
-                <div class="result-card error">
-                    <div class="result-header">
-                        <div class="result-title">⚠️ Search Error</div>
-                        <div class="result-badge badge-not-found">Error</div>
-                    </div>
-                    
-                    <div class="result-details">
-                        <div class="detail-item">
-                            <span>🏷️</span>
-                            <span>Handle: <span class="detail-value">@${handle}</span></span>
-                        </div>
-                        <div class="detail-item">
-                            <span>📱</span>
-                            <span>Platform: <span class="detail-value">${platform.charAt(0).toUpperCase() + platform.slice(1)}</span></span>
-                        </div>
-                    </div>
-                    
+                <div class="result-card error" id="card-${uniqueId}">
+                    <div class="result-header"> <div class="result-title">⚠️ Search Error for @${handle} on ${platform}</div> </div>
                     <p style="margin: 15px 0; color: #666;"><strong>Error:</strong> ${error}</p>
-                    
                     <div class="result-actions">
-                        <button onclick="searchHandle('${handle}', '${platform}')" class="action-btn btn-primary">
-                            🔄 Try Again
-                        </button>
+                        <button onclick="searchHandle('${handle}', '${platform}')" class="action-btn btn-primary">🔄 Try Again</button>
                     </div>
                 </div>
             `;
-            const loadingCard = document.getElementById(`card-${uniqueId}`);
-            if(loadingCard) {
-                loadingCard.outerHTML = errorCardHTML;
-            }
+            if (card) { card.outerHTML = errorCardHTML; }
+            else { resultsContainer.insertAdjacentHTML('beforeend', errorCardHTML); }
         }
 
-        function handleSaveClick(uniqueId) {
+        function handleSaveClick(handle, uniqueId) {
             const contactInput = document.getElementById(`contactInput-${uniqueId}`);
             const fullNameInput = document.getElementById(`fullNameInput-${uniqueId}`);
             const errorMsg = document.getElementById(`contactError-${uniqueId}`);
@@ -876,7 +825,7 @@
                 return;
             }
             
-            saveProfileWithContact(uniqueId, contactNumber, fullName);
+            saveProfileWithContact(handle, uniqueId, contactNumber, fullName);
         }
 
         function updateUI(state) {
@@ -886,14 +835,12 @@
                     btnText.innerHTML = '⏳ Searching...';
                     statusIndicator.style.background = '#ff9800';
                     break;
-                    
                 case 'success':
                     searchBtn.disabled = false;
                     btnText.innerHTML = '🔍 Search';
                     statusIndicator.style.background = '#4caf50';
                     handleInput.value = '';
                     break;
-                    
                 case 'error':
                     searchBtn.disabled = false;
                     btnText.innerHTML = '🔍 Search';
