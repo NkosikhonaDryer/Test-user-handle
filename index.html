@@ -59,7 +59,6 @@
             font-weight: 500;
         }
         
-        /* NEW: Disabled style for platform buttons */
         .platform-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
@@ -570,7 +569,7 @@
         let successfulSearchCount = 0;
         let isSearching = false;
         let currentPlatform = 'instagram';
-        let searchedPlatforms = new Set(); // NEW: Tracks searched platforms for the session
+        let searchedPlatforms = new Set(); 
 
         // DOM elements
         const platformButtons = document.querySelectorAll('.platform-btn');
@@ -611,8 +610,8 @@
             globalSaveContainer.style.display = 'none';
             sessionDataStore = {};
             successfulSearchCount = 0;
-            searchedPlatforms.clear(); // NEW: Clear the set of searched platforms
-            platformButtons.forEach(btn => btn.disabled = false); // Re-enable platform buttons
+            searchedPlatforms.clear(); 
+            platformButtons.forEach(btn => btn.disabled = false); 
             handleInput.value = '';
             handleInput.focus();
         });
@@ -622,7 +621,6 @@
         async function searchHandle(handle, platform) {
             if (isSearching) return;
 
-            // NEW: Prevent searching on the same platform twice
             if (searchedPlatforms.has(platform)) {
                 showTemporaryMessage(`You have already searched on ${platform}. Please use the other platform.`);
                 return;
@@ -821,7 +819,6 @@
                 }
                 sessionDataStore[uniqueId] = profileData;
                 
-                // NEW: Track the searched platform and auto-switch
                 searchedPlatforms.add(platform);
                 document.querySelector(`.platform-btn[data-platform="${platform}"]`).disabled = true;
                 const nextPlatform = platform === 'instagram' ? 'tiktok' : 'instagram';
@@ -866,15 +863,16 @@
                 `;
                 
                 if (accountType === 'Personal') {
+                    // UPDATED: Standardized class for red background, but kept original text logic
+                    const notificationClass = 'notification instagram-warning'; 
                     const isInstagram = platform.toLowerCase() === 'instagram';
-                    const notificationClass = isInstagram ? 'notification instagram-warning' : 'notification';
-                    const instructionUrl = isInstagram 
+                    const instructionUrl = isInstagram
                         ? 'https://help.instagram.com/502981923235522'
                         : 'https://support.tiktok.com/en/business-and-creator/creator-and-business-accounts/business-account-on-tiktok';
                     
                     const notificationText = isInstagram 
-                        ? "In order to register with us you need to register your profile as creator on instagram."
-                        : "This is a Personal account. To unlock more features and analytics, consider switching to a professional account.";
+                        ? "This is a Personal account. In order to register with us you need to switch your profile to a Professional account. See the link below"
+                        : "This is a Personal account. To unlock more features and analytics, consider switching to a professional account. See the link below";
 
                     notificationHTML = `<div class="${notificationClass}"><div class="notification-icon">💡</div><div class="notification-content"><div class="notification-title">Switch to Professional Account</div><div class="notification-text">${notificationText}</div><a href="${instructionUrl}" target="_blank" class="notification-link">📚 View ${platformName} Instructions<span>↗</span></a></div></div>`;
                 }
