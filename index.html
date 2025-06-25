@@ -58,8 +58,16 @@
             gap: 8px;
             font-weight: 500;
         }
+        
+        /* NEW: Disabled style for platform buttons */
+        .platform-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #f5f5f5;
+        }
 
-        .platform-btn:hover {
+
+        .platform-btn:hover:not(:disabled) {
             border-color: #667eea;
             background: #f8f9ff;
         }
@@ -83,6 +91,15 @@
             display: flex;
             gap: 15px;
             margin-bottom: 25px;
+        }
+        
+        #searchMessage {
+            text-align: center;
+            color: #f44336;
+            font-weight: 500;
+            margin-top: -15px;
+            margin-bottom: 15px;
+            height: 20px;
         }
 
         .search-input {
@@ -531,6 +548,8 @@
                 <span>🧹 Clear</span>
             </button>
         </form>
+        
+        <div id="searchMessage"></div>
 
         <div id="resultsContainer" class="results-container"></div>
         
@@ -547,10 +566,11 @@
         };
 
         // State management
-        let sessionDataStore = {}; // Stores all successful profile data by uniqueId
-        let successfulSearchCount = 0; // Counter for successful searches
+        let sessionDataStore = {}; 
+        let successfulSearchCount = 0;
         let isSearching = false;
         let currentPlatform = 'instagram';
+        let searchedPlatforms = new Set(); // NEW: Tracks searched platforms for the session
 
         // DOM elements
         const platformButtons = document.querySelectorAll('.platform-btn');
@@ -562,10 +582,12 @@
         const globalSaveContainer = document.getElementById('globalSaveContainer');
         const statusIndicator = document.getElementById('statusIndicator');
         const clearBtn = document.getElementById('clearBtn');
+        const searchMessage = document.getElementById('searchMessage');
 
         // Event listeners
         platformButtons.forEach(btn => {
             btn.addEventListener('click', () => {
+                if (btn.disabled) return;
                 platformButtons.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 currentPlatform = btn.dataset.platform;
@@ -589,6 +611,8 @@
             globalSaveContainer.style.display = 'none';
             sessionDataStore = {};
             successfulSearchCount = 0;
+            searchedPlatforms.clear(); // NEW: Clear the set of searched platforms
+            platformButtons.forEach(btn => btn.disabled = false); // Re-enable platform buttons
             handleInput.value = '';
             handleInput.focus();
         });
@@ -597,6 +621,12 @@
         // Core search function
         async function searchHandle(handle, platform) {
             if (isSearching) return;
+
+            // NEW: Prevent searching on the same platform twice
+            if (searchedPlatforms.has(platform)) {
+                showTemporaryMessage(`You have already searched on ${platform}. Please use the other platform.`);
+                return;
+            }
             
             isSearching = true;
             const uniqueId = `${platform}-${handle}`;
@@ -746,7 +776,7 @@
                 if (!response.ok) throw new Error(`Failed to save: ${await response.text()}`);
                 
                 globalSaveContainer.innerHTML = `<div class="success-message">✅ All profiles saved successfully!</div>`;
-                document.querySelectorAll('.contact-form, .result-actions').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.save-section').forEach(el => el.style.display = 'none');
 
 
             } catch (error) {
@@ -790,6 +820,13 @@
                     successfulSearchCount++;
                 }
                 sessionDataStore[uniqueId] = profileData;
+                
+                // NEW: Track the searched platform and auto-switch
+                searchedPlatforms.add(platform);
+                document.querySelector(`.platform-btn[data-platform="${platform}"]`).disabled = true;
+                const nextPlatform = platform === 'instagram' ? 'tiktok' : 'instagram';
+                document.querySelector(`.platform-btn[data-platform="${nextPlatform}"]`).click();
+
             }
 
             renderSeparateCard(profileData, handle, platform, uniqueId);
@@ -808,7 +845,7 @@
             const statusText = exists ? 'Handle Exists' : 'Handle Does Not Exist';
             const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
             
-            let detailsHTML = '', contactFormHTML = '', actionsHTML = '', badgeHTML = '', notificationHTML = '';
+            let detailsHTML = '', saveSectionHTML = '', badgeHTML = '', notificationHTML = '';
 
             if (exists) {
                 const { nickname, accountType, profileUrl, username } = profileData;
@@ -823,7 +860,7 @@
                         <div class="detail-item"><span>🏷️</span><span>Username: <span class="detail-value">@${username}</span></span></div>
                         <div class="detail-item"><span>📊</span><span>Status: <span class="detail-value">${statusText}</span></span></div>
                     </div>
-                    <div class="result-actions" style="justify-content: flex-start; margin-top: 0; margin-bottom: 15px;">
+                    <div class="view-profile-section" style="margin-top: -15px; margin-bottom: 15px;">
                          <a href="${profileUrl}" target="_blank" class="action-btn btn-secondary">🔗 View Profile</a>
                     </div>
                 `;
@@ -835,9 +872,8 @@
                         ? 'https://help.instagram.com/502981923235522'
                         : 'https://support.tiktok.com/en/business-and-creator/creator-and-business-accounts/business-account-on-tiktok';
                     
-                    // UPDATED: Text for Instagram notification
                     const notificationText = isInstagram 
-                        ? "This is a Personal account. In order to register with us you need to switch your profile to a professional account."
+                        ? "In order to register with us you need to register your profile as creator on instagram."
                         : "This is a Personal account. To unlock more features and analytics, consider switching to a professional account.";
 
                     notificationHTML = `<div class="${notificationClass}"><div class="notification-icon">💡</div><div class="notification-content"><div class="notification-title">Switch to Professional Account</div><div class="notification-text">${notificationText}</div><a href="${instructionUrl}" target="_blank" class="notification-link">📚 View ${platformName} Instructions<span>↗</span></a></div></div>`;
@@ -847,21 +883,20 @@
                 const saveDisabledAttr = isInstaPersonal ? 'disabled' : '';
                 const saveDisabledTitle = isInstaPersonal ? 'Cannot save Personal Instagram accounts.' : 'Save this profile';
 
-                contactFormHTML = `<div class="contact-form" id="contactForm-${uniqueId}"><h3>📞 Add Contact Information</h3><div class="contact-input-group"><input type="text" class="contact-input" placeholder="Full Name" id="fullNameInput-${uniqueId}" value="${nickname}"><input type="tel" class="contact-input" placeholder="Phone Number" id="contactInput-${uniqueId}" required></div><div class="error-message" id="contactError-${uniqueId}"></div></div>`;
-                actionsHTML = `<div class="result-actions" id="resultActions-${uniqueId}"><button onclick="saveProfile('${uniqueId}')" class="action-btn btn-save" id="saveBtn-${uniqueId}" ${saveDisabledAttr} title="${saveDisabledTitle}">💾 Save Profile</button></div>`;
+                saveSectionHTML = `<div class="save-section" id="saveSection-${uniqueId}"><div class="contact-form" id="contactForm-${uniqueId}"><h3>📞 Add Contact Information</h3><div class="contact-input-group"><input type="text" class="contact-input" placeholder="Full Name" id="fullNameInput-${uniqueId}" value="${nickname}"><input type="tel" class="contact-input" placeholder="Phone Number" id="contactInput-${uniqueId}" required></div><div class="error-message" id="contactError-${uniqueId}"></div></div><div class="result-actions" id="resultActions-${uniqueId}"><button onclick="saveProfile('${uniqueId}')" class="action-btn btn-save" id="saveBtn-${uniqueId}" ${saveDisabledAttr} title="${saveDisabledTitle}">💾 Save Profile</button></div></div>`;
 
             } else {
                  badgeHTML = `<div class="result-badge badge-not-found">Not Found</div>`;
             }
 
-            const cardHTML = `<div class="result-card ${cardClass}" id="card-${uniqueId}"><div class="result-header"><div class="result-title">${statusIcon} ${statusText}</div>${badgeHTML}</div>${detailsHTML}${notificationHTML}${contactFormHTML}${actionsHTML}</div>`;
+            const cardHTML = `<div class="result-card ${cardClass}" id="card-${uniqueId}"><div class="result-header"><div class="result-title">${statusIcon} ${statusText}</div>${badgeHTML}</div>${detailsHTML}${notificationHTML}${saveSectionHTML}</div>`;
             
             if (card) { card.outerHTML = cardHTML; }
             else { resultsContainer.insertAdjacentHTML('beforeend', cardHTML); }
         }
         
         function renderGlobalSave() {
-            document.querySelectorAll('.contact-form, .result-actions').forEach(el => {
+            document.querySelectorAll('.save-section').forEach(el => {
                 el.style.display = 'none';
             });
             
@@ -899,6 +934,13 @@
             const errorCardHTML = `<div class="result-card error" id="card-${uniqueId}"><div class="result-header"> <div class="result-title">⚠️ Search Error for @${handle} on ${platform}</div> </div><p style="margin: 15px 0; color: #666;"><strong>Error:</strong> ${error}</p><div class="result-actions"><button onclick="searchHandle('${handle}', '${platform}')" class="action-btn btn-primary">🔄 Try Again</button></div></div>`;
             if (card) { card.outerHTML = errorCardHTML; }
             else { resultsContainer.insertAdjacentHTML('beforeend', errorCardHTML); }
+        }
+
+        function showTemporaryMessage(message) {
+            searchMessage.textContent = message;
+            setTimeout(() => {
+                searchMessage.textContent = '';
+            }, 3000);
         }
 
         function updateUI(state) {
