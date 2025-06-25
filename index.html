@@ -786,7 +786,7 @@
                     profileUrl: data.profileUrl || (platform === 'instagram' ? `https://instagram.com/${handle}` : `https://tiktok.com/@${handle}`),
                     exists: true
                 };
-                if (!sessionDataStore[uniqueId]) { // Only count if it's a new successful search
+                if (!sessionDataStore[uniqueId]) {
                     successfulSearchCount++;
                 }
                 sessionDataStore[uniqueId] = profileData;
@@ -834,7 +834,13 @@
                     const instructionUrl = isInstagram 
                         ? 'https://help.instagram.com/502981923235522'
                         : 'https://support.tiktok.com/en/business-and-creator/creator-and-business-accounts/business-account-on-tiktok';
-                    notificationHTML = `<div class="${notificationClass}"><div class="notification-icon">💡</div><div class="notification-content"><div class="notification-title">Switch to Professional Account</div><div class="notification-text">This is a Personal account. To unlock more features and analytics, consider switching to a professional account.</div><a href="${instructionUrl}" target="_blank" class="notification-link">📚 View ${platformName} Instructions<span>↗</span></a></div></div>`;
+                    
+                    // UPDATED: Text for Instagram notification
+                    const notificationText = isInstagram 
+                        ? "This is a Personal account. In order to register with us you need to switch your profile to a professional account."
+                        : "This is a Personal account. To unlock more features and analytics, consider switching to a professional account.";
+
+                    notificationHTML = `<div class="${notificationClass}"><div class="notification-icon">💡</div><div class="notification-content"><div class="notification-title">Switch to Professional Account</div><div class="notification-text">${notificationText}</div><a href="${instructionUrl}" target="_blank" class="notification-link">📚 View ${platformName} Instructions<span>↗</span></a></div></div>`;
                 }
                 
                 const isInstaPersonal = platform === 'instagram' && accountType === 'Personal';
